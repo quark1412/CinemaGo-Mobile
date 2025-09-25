@@ -1,24 +1,42 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useEffect, useState } from "react";
+import { Slot } from "expo-router";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import "../global.css";
+import { StatusBar } from "react-native";
+import { ToastProvider } from "@/contexts/toastContext";
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const [loaded, error] = useFonts({
+    regular: require("../assets/fonts/Urbanist-Regular.ttf"),
+    medium: require("../assets/fonts/Urbanist-Medium.ttf"),
+    semibold: require("../assets/fonts/Urbanist-SemiBold.ttf"),
+    light: require("../assets/fonts/Urbanist-Light.ttf"),
+    bold: require("../assets/fonts/Urbanist-Bold.ttf"),
+    black: require("../assets/fonts/Urbanist-Black.ttf"),
+    extraBold: require("../assets/fonts/Urbanist-ExtraBold.ttf"),
+  });
+
+  useEffect(() => {
+    if (loaded && !error) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, error]);
+
+  if (!loaded && !error) {
+    return null;
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    // <SessionProvider>
+    <ToastProvider>
+      <StatusBar barStyle={"dark-content"} />
+      <Slot />
+    </ToastProvider>
+    // </SessionProvider>
   );
 }
