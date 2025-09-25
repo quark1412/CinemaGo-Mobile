@@ -12,13 +12,13 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    regular: require("../assets/fonts/Urbanist-Regular.ttf"),
-    medium: require("../assets/fonts/Urbanist-Medium.ttf"),
-    semibold: require("../assets/fonts/Urbanist-SemiBold.ttf"),
-    light: require("../assets/fonts/Urbanist-Light.ttf"),
-    bold: require("../assets/fonts/Urbanist-Bold.ttf"),
-    black: require("../assets/fonts/Urbanist-Black.ttf"),
-    extraBold: require("../assets/fonts/Urbanist-ExtraBold.ttf"),
+    regular: require("../assets/fonts/Manrope-Regular.ttf"),
+    medium: require("../assets/fonts/Manrope-Medium.ttf"),
+    semibold: require("../assets/fonts/Manrope-SemiBold.ttf"),
+    light: require("../assets/fonts/Manrope-Light.ttf"),
+    extraLight: require("../assets/fonts/Manrope-ExtraLight.ttf"),
+    bold: require("../assets/fonts/Manrope-Bold.ttf"),
+    extraBold: require("../assets/fonts/Manrope-ExtraBold.ttf"),
   });
 
   useEffect(() => {
