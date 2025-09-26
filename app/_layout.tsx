@@ -7,6 +7,7 @@ import { Slot } from "expo-router";
 import "../global.css";
 import { StatusBar } from "react-native";
 import { ToastProvider } from "@/contexts/toastContext";
+import { ThemeProvider } from "@/contexts/themeContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,10 +34,12 @@ export default function RootLayout() {
 
   return (
     // <SessionProvider>
-    <ToastProvider>
-      <StatusBar barStyle={"dark-content"} />
-      <Slot />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <StatusBar />
+        <Slot />
+      </ToastProvider>
+    </ThemeProvider>
     // </SessionProvider>
   );
 }
