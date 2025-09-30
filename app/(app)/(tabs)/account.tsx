@@ -29,7 +29,7 @@ export default function Account() {
       className={`flex-1 ${isDark ? "dark" : "light"} bg-background`}
     >
       <View className="flex-row items-center justify-between p-4">
-        <Text className="text-2xl text-center font-[semibold] text-foreground">
+        <Text className="text-2xl text-center font-[bold] text-foreground">
           Account
         </Text>
         <TouchableOpacity
@@ -58,7 +58,7 @@ export default function Account() {
         <View className="flex gap-2">
           <TouchableOpacity
             className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
-            // onPress={() => router.push("/screens/edit-profile")}
+            onPress={() => router.push("/screens/edit-profile")}
           >
             <Ionicons
               name="person-outline"
@@ -72,7 +72,7 @@ export default function Account() {
 
           <TouchableOpacity
             className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
-            // onPress={() => router.push("/screens/change-password")}
+            onPress={() => router.push("/screens/change-password")}
           >
             <Ionicons
               name="lock-closed-outline"
@@ -86,7 +86,7 @@ export default function Account() {
 
           <TouchableOpacity
             className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
-            // onPress={() => router.push("/screens/my-orders")}
+            onPress={() => router.push("/screens/my-tickets")}
           >
             <Ionicons
               name="list-outline"
@@ -100,7 +100,7 @@ export default function Account() {
         </View>
 
         <TouchableOpacity
-          className="flex-row items-center p-4 bg-red-100 dark:bg-red-900/20 rounded-xl border border-red-400 dark:border-red-700 mt-auto"
+          className={`flex-row items-center p-4 ${isDark ? "bg-red-900/20 border-red-800/50" : "bg-red-50 border-red-200"}  rounded-xl border  mt-auto`}
           // onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
