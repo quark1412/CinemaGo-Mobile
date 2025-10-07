@@ -60,7 +60,9 @@ export const authService = {
 
   getProfile: async () => {
     try {
-      const response = await instance.get(`/users/profile`);
+      const response = await instance.get(`/users/profile`, {
+        requiresAuth: true,
+      } as any);
       return response.data.data;
     } catch (error) {
       throw error;
