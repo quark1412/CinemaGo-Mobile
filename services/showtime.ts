@@ -1,66 +1,60 @@
-import axiosConfig from "@/configs/axiosConfig";
+import instance from "../configs/axiosConfig";
+import {
+  Showtime,
+  GetShowtimesParams,
+  ShowtimesResponse,
+} from "../types/showtime";
 
-export interface ShowtimeDetails {
-  id: string;
-  movieId: string;
-  cinemaId: string;
-  roomId: string;
-  startTime: string;
-  endTime: string;
-  date: string;
-  price: number;
-  movieTitle?: string;
-  cinemaName?: string;
-  roomName?: string;
-}
+export const getAllShowtimes = async (
+  params?: GetShowtimesParams
+): Promise<ShowtimesResponse> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.movieId) queryParams.append("movieId", params.movieId);
+    if (params?.cinemaId) queryParams.append("cinemaId", params.cinemaId);
+    if (params?.roomId) queryParams.append("roomId", params.roomId);
+    if (params?.isActive !== undefined)
+      queryParams.append("isActive", params.isActive.toString());
+    if (params?.startTime) queryParams.append("startTime", params.startTime);
+    if (params?.endTime) queryParams.append("endTime", params.endTime);
 
-export const showtimeService = {
-  // Get showtime details by ID
-  getShowtimeById: async (showtimeId: string): Promise<ShowtimeDetails> => {
-    try {
-      const response = await axiosConfig.get(
-        `/showtime-service/api/showtimes/public/${showtimeId}`
-      );
+    const response = await instance.get(
+      `/showtimes/public?${queryParams.toString()}`,
+      {
+        requiresAuth: true,
+      } as any
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
 
-      const showtime = {
-        ...response.data.data,
-        startTime: response.data.data.startTime,
-        endTime: response.data.data.endTime,
-      } as ShowtimeDetails;
+export const getShowtimesByCinemaId = async (
+  cinemaId: string,
+  params?: Omit<GetShowtimesParams, "cinemaId">
+): Promise<ShowtimesResponse> => {
+  return getAllShowtimes({ ...params, cinemaId });
+};
 
-      return showtime;
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch showtime details"
-      );
-    }
-  },
+export const getShowtimesByMovieId = async (
+  movieId: string,
+  params?: Omit<GetShowtimesParams, "movieId">
+): Promise<ShowtimesResponse> => {
+  return getAllShowtimes({ ...params, movieId });
+};
 
-  // Get all showtimes for a movie
-  getShowtimesByMovieId: async (movieId: string) => {
-    try {
-      const response = await axiosConfig.get(
-        `/showtime-service/api/showtimes/movie/${movieId}`
-      );
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch showtimes"
-      );
-    }
-  },
-
-  // Get all showtimes for a cinema
-  getShowtimesByCinemaId: async (cinemaId: string) => {
-    try {
-      const response = await axiosConfig.get(
-        `/showtime-service/api/showtimes/cinema/${cinemaId}`
-      );
-      return response.data.data;
-    } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch showtimes"
-      );
-    }
-  },
+export const getShowtimeById = async (
+  id: string
+): Promise<{ data: Showtime }> => {
+  try {
+    const response = await instance.get(`/showtimes/public/${id}`, {
+      requiresAuth: true,
+    } as any);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 };

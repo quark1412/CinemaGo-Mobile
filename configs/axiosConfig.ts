@@ -3,11 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 import dayjs from "dayjs";
 
-const baseURL = process.env.EXPO_PUBLIC_BASE_URL;
+const baseURL =
+  /* process.env.EXPO_PUBLIC_BASE_URL || */ "http://192.168.1.6:8000/v1";
+console.log(process.env.EXPO_PUBLIC_BASE_URL);
 
 const instance = axios.create({
   baseURL,
-  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -21,52 +22,82 @@ instance.interceptors.request.use(
   async (
     req: CustomAxiosRequestConfig
   ): Promise<InternalAxiosRequestConfig> => {
-    const accessToken = await AsyncStorage.getItem("accessToken");
-    const refreshToken = await AsyncStorage.getItem("refreshToken");
-
-    const requiresAuth = req.requiresAuth !== false;
-
-    if (!requiresAuth) {
-      return req;
-    }
-
-    if (!req.headers) {
-      req.headers = axios.AxiosHeaders.from(req.headers || {});
-    }
-
-    if (accessToken) {
-      try {
-        const user: { exp: number } = jwtDecode(accessToken);
-        const isExpired = dayjs.unix(user.exp).diff(dayjs()) < 1;
-
-        if (!isExpired) {
-          req.headers.Authorization = `Bearer ${accessToken}`;
-          return req;
-        }
-      } catch (err) {
-        console.warn("Invalid token:", err);
-      }
-    }
-
     try {
-      const response = await axios.post(`${baseURL}/auth/refreshToken`, {
-        refreshToken,
-      });
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
 
-      const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
-        response.data.data;
+      const requiresAuth = req.requiresAuth !== false;
 
-      await AsyncStorage.setItem("accessToken", newAccessToken);
-      await AsyncStorage.setItem("refreshToken", newRefreshToken);
+      if (!requiresAuth) {
+        return req;
+      }
 
-      req.headers.Authorization = `Bearer ${newAccessToken}`;
-      return req;
-    } catch (err) {
-      console.log("Token refresh failed:", err);
-      await AsyncStorage.removeItem("accessToken");
-      await AsyncStorage.removeItem("refreshToken");
+      if (!req.headers) {
+        req.headers = axios.AxiosHeaders.from(req.headers || {});
+      }
+
+      if (accessToken) {
+        try {
+          const user: { exp: number } = jwtDecode(accessToken);
+          const isExpired = dayjs.unix(user.exp).diff(dayjs()) < 1;
+
+          if (!isExpired) {
+            req.headers.Authorization = `Bearer ${accessToken}`;
+            return req;
+          }
+        } catch (err) {
+          console.warn("Invalid token:", err);
+        }
+      }
+
+      try {
+        const response = await axios.post(`${baseURL}/auth/refreshToken`, {
+          refreshToken,
+        });
+
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+          response.data.data;
+
+        await AsyncStorage.setItem("accessToken", newAccessToken);
+        await AsyncStorage.setItem("refreshToken", newRefreshToken);
+
+        req.headers.Authorization = `Bearer ${newAccessToken}`;
+        return req;
+      } catch (err: any) {
+        console.log("Token refresh failed:", err?.message || "Unknown error");
+        await AsyncStorage.removeItem("accessToken");
+        await AsyncStorage.removeItem("refreshToken");
+        return req;
+      }
+    } catch (error: any) {
+      console.error(
+        "Request interceptor error:",
+        error?.message || "Unknown error"
+      );
       return req;
     }
+  }
+);
+
+// Add response interceptor for better error handling
+instance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      // Server responded with error
+      console.error(
+        "API Error:",
+        error.response.status,
+        error.response.data?.message || error.message
+      );
+    } else if (error.request) {
+      // Request made but no response
+      console.error("Network Error: No response received", error.message);
+    } else {
+      // Something else happened
+      console.error("Request Error:", error.message);
+    }
+    return Promise.reject(error);
   }
 );
 
