@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { useState, useEffect } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { generateBookingQRData } from "@/utils/qrCodeHelpers";
-import { showtimeService } from "@/services/showtime";
+import { getShowtimeById } from "@/services/showtime";
 
 interface TicketProps {
   booking: Booking;
@@ -39,17 +39,15 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
     const fetchTicketData = async () => {
       try {
         // Fetch showtime details using the real API
-        const showtimeDetails = await showtimeService.getShowtimeById(
-          booking.showtimeId
-        );
+        const showtimeDetails = await getShowtimeById(booking.showtimeId);
 
         setShowtimeData({
           id: booking.showtimeId,
-          movieTitle: showtimeDetails.movieTitle || "Movie Title",
-          cinemaName: showtimeDetails.cinemaName || "CinemaGo Cinema",
-          roomName: showtimeDetails.roomName || "Theater Room",
-          startTime: showtimeDetails.startTime,
-          date: showtimeDetails.date || booking.createdAt.toLocaleDateString(),
+          movieTitle: showtimeDetails.data.movie?.title || "Movie Title",
+          cinemaName: showtimeDetails.data.cinema?.name || "CinemaGo Cinema",
+          roomName: showtimeDetails.data.room?.name || "Theater Room",
+          startTime: showtimeDetails.data.startTime,
+          date: formatDate(showtimeDetails.data.startTime),
           price: booking.totalPrice / booking.bookingSeats.length,
         });
 
@@ -112,9 +110,9 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("vi-VN", {
       style: "currency",
-      currency: "USD",
+      currency: "VND",
     }).format(price);
   };
 

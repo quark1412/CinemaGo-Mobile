@@ -204,9 +204,9 @@ export default function MyTickets() {
               Total Spent
             </Text>
             <Text className="text-primary text-lg font-[bold]">
-              {new Intl.NumberFormat("en-US", {
+              {new Intl.NumberFormat("vi-VN", {
                 style: "currency",
-                currency: "USD",
+                currency: "VND",
               }).format(
                 bookings.reduce(
                   (total, booking) => total + booking.totalPrice,

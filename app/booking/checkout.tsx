@@ -54,7 +54,10 @@ export default function CheckoutScreen() {
           <View className="mb-5 py-4 border-b border-slate-800">
             <Text className="text-sm text-slate-400 mb-2">Total Price:</Text>
             <Text className="text-3xl font-bold text-rose-600">
-              ${price.toFixed(2)}
+              {new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(price)}
             </Text>
           </View>
 

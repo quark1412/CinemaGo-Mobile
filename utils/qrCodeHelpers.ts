@@ -106,9 +106,9 @@ export const formatBookingForDisplay = (qrData: BookingQRData) => {
   return {
     bookingId: qrData.bookingId.toUpperCase(),
     shortBookingId: qrData.bookingId.slice(-8).toUpperCase(),
-    formattedPrice: new Intl.NumberFormat("en-US", {
+    formattedPrice: new Intl.NumberFormat("vi-VN", {
       style: "currency",
-      currency: "USD",
+      currency: "VND",
     }).format(qrData.totalPrice),
     seatCount: qrData.seats.length,
     seatList: qrData.seats.join(", "),

@@ -594,7 +594,12 @@ export default function ShowtimeSelectionScreen() {
                 ? "Select your seats"
                 : `Seats: ${selectedSeatNumbers}`}
             </Text>
-            <Text style={styles.totalPrice}>${totalPrice.toFixed(2)}</Text>
+            <Text style={styles.totalPrice}>
+              {new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(totalPrice)}
+            </Text>
           </View>
           <TouchableOpacity
             style={[
