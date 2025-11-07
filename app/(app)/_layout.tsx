@@ -10,7 +10,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="movies/[id]" />
-        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="/auth/sign-in" />
       </Stack>
     </>
   );

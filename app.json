@@ -3,6 +3,7 @@
     "name": "cinemago-mobile",
     "slug": "cinemago-mobile",
     "version": "1.0.0",
+    "jsEngine": "jsc hermes",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cinemagomobile",
@@ -21,7 +22,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.cinemago.mobile"
+      "package": "com.cinemago.mobile",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "output": "static",
@@ -41,7 +43,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
