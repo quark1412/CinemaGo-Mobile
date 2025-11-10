@@ -299,7 +299,7 @@ export default function SignUp() {
               {/* Footer */}
               <View className="items-center mt-3">
                 <Text className="text-white/75 text-xs">
-                  © {new Date().getFullYear()} CinemaGo
+                  © {new Date().getFullYear()} CinemaGoGo
                 </Text>
               </View>
             </KeyboardAwareScrollView>
