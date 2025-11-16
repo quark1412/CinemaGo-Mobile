@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { ThemeProvider } from "@/contexts/themeContext";
 import { ToastProvider } from "@/contexts/toastContext";
+import { UserProvider } from "@/contexts/userContext";
 import { StatusBar } from "react-native";
 import "../global.css";
 
@@ -35,8 +36,10 @@ export default function RootLayout() {
     // <SessionProvider>
     <ThemeProvider>
       <ToastProvider>
-        <StatusBar />
-        <Slot />
+        <UserProvider>
+          <StatusBar />
+          <Slot />
+        </UserProvider>
       </ToastProvider>
     </ThemeProvider>
     // </SessionProvider>

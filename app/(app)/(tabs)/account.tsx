@@ -1,11 +1,11 @@
 // app/(app)/(tabs)/account.tsx (ví dụ)
 import { useTheme } from "@/contexts/themeContext";
 import { useToast } from "@/contexts/toastContext";
-import { User } from "@/types/user";
+import { useUser } from "@/contexts/userContext";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Link, router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Image, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,22 +20,16 @@ import {
 export default function Account() {
   const { showToast } = useToast();
   const { toggleTheme, isDark } = useTheme();
-
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useUser();
 
   // Biometric state
   const [bioSupported, setBioSupported] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [checkingBio, setCheckingBio] = useState(true);
 
-  const loadUserData = useCallback(async () => {
-    const userData = await AsyncStorage.getItem("user");
-    if (userData) setUser(JSON.parse(userData));
-  }, []);
-
   useEffect(() => {
-    loadUserData();
-  }, [loadUserData]);
+    console.log(user);
+  }, [user]);
 
   // Kiểm tra thiết bị & trạng thái bật/tắt
   useEffect(() => {
@@ -68,7 +62,7 @@ export default function Account() {
 
       // Lấy refresh_token hiện tại (hoặc từ session của bạn)
       const currentRefreshToken =
-        (await AsyncStorage.getItem("refresh_token")) || "";
+        (await AsyncStorage.getItem("refreshToken")) || "";
       if (!currentRefreshToken) {
         showToast("Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.");
         return;
@@ -84,7 +78,7 @@ export default function Account() {
 
   // Đăng xuất
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove(["user", "access_token", "refresh_token"]);
+    await AsyncStorage.multiRemove(["user", "accessToken", "refreshToken"]);
     // Nếu muốn tắt luôn sinh trắc học khi logout:
     await disableBiometricLogin().catch(() => {});
     router.replace("/auth/sign-in"); // nếu (auth) là group
@@ -172,32 +166,27 @@ export default function Account() {
           </TouchableOpacity>
 
           {/* Biometric toggle row */}
-          <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
-            <View className="flex-row items-center">
-              <Ionicons
-                name="finger-print-outline"
-                size={24}
-                color={isDark ? "#fff" : "#1f2937"}
-              />
-              <View className="ml-3">
-                <Text className="font-[semibold] text-foreground">
-                  Đăng nhập sinh trắc học
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  {checkingBio
-                    ? "Đang kiểm tra thiết bị..."
-                    : bioSupported
-                      ? "Dùng vân tay/khuôn mặt để mở ứng dụng nhanh hơn"
-                      : "Thiết bị không hỗ trợ hoặc chưa đăng ký"}
-                </Text>
+          {bioSupported && (
+            <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
+              <View className="flex-row items-center">
+                <Ionicons
+                  name="finger-print-outline"
+                  size={24}
+                  color={isDark ? "#fff" : "#1f2937"}
+                />
+                <View className="ml-3">
+                  <Text className="font-[semibold] text-foreground">
+                    Đăng nhập sinh trắc học
+                  </Text>
+                </View>
               </View>
+              <Switch
+                value={bioEnabled}
+                onValueChange={onToggleBiometric}
+                disabled={!bioSupported || checkingBio}
+              />
             </View>
-            <Switch
-              value={bioEnabled}
-              onValueChange={onToggleBiometric}
-              disabled={!bioSupported || checkingBio}
-            />
-          </View>
+          )}
         </View>
 
         {/* Sign out */}
@@ -212,17 +201,6 @@ export default function Account() {
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
           <Text className="ml-3 font-[semibold] text-red-500">Sign Out</Text>
         </TouchableOpacity>
-
-        {/* Links legal (tuỳ chọn) */}
-        <View className="mt-3 flex-row justify-center gap-3">
-          <Link href="/terms" className="text-xs text-muted-foreground">
-            Điều khoản
-          </Link>
-          <Text className="text-xs text-muted-foreground">•</Text>
-          <Link href="/privacy" className="text-xs text-muted-foreground">
-            Chính sách
-          </Link>
-        </View>
       </View>
     </SafeAreaView>
   );

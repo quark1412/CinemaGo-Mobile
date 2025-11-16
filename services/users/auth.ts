@@ -70,6 +70,8 @@ export const authService = {
       const response = await instance.get(`/users/profile`, {
         requiresAuth: true,
       } as any);
+      console.log("profile nè: ", response.data.data);
+
       return response.data.data;
     } catch (error) {
       throw error;
@@ -105,9 +107,33 @@ export const authService = {
       throw error;
     }
   },
+
   isAuthenticated: async () => {
     const accessToken = await AsyncStorage.getItem("accessToken");
     const refreshToken = await AsyncStorage.getItem("refreshToken");
     return !!(accessToken || refreshToken);
+  },
+
+  sendVerificationEmail: async (email: string) => {
+    try {
+      const response = await instance.post(`/auth/send-verification-link`, {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  verifyAccountByLink: async (userId: string, token: string) => {
+    try {
+      const response = await instance.post(`/auth/verify-account-by-link`, {
+        userId,
+        token,
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 };

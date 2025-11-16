@@ -1,12 +1,12 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
 import { authService } from "@/services/users/auth";
 import { useRouter } from "expo-router";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 interface User {
   id: string;
@@ -19,6 +19,7 @@ interface User {
 
 interface UserContextType {
   user: User | null;
+  setUser: (user: User | null) => void;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -39,6 +40,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (await authService.isAuthenticated()) {
         const userData = await authService.getProfile();
         setUser(userData);
+
         setIsAuthenticated(true);
       } else {
         setUser(null);
@@ -67,12 +69,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       await authService.logout();
       setUser(null);
       setIsAuthenticated(false);
-      router.replace("/sign-in");
+      router.replace("/(app)/auth/sign-in");
     } catch (error) {
       console.error("Logout error:", error);
       setUser(null);
       setIsAuthenticated(false);
-      router.replace("/sign-in");
+      router.replace("/(app)/auth/sign-in");
     }
   };
 
@@ -86,6 +88,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const value: UserContextType = {
     user,
+    setUser,
     isLoading,
     isAuthenticated,
     login,

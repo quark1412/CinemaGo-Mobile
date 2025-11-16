@@ -1,9 +1,11 @@
-import { useToast } from "@/contexts/toastContext";
 import { useTheme } from "@/contexts/themeContext";
-import { User } from "@/types/user";
+import { useToast } from "@/contexts/toastContext";
+import { useUser } from "@/contexts/userContext";
+import { authService } from "@/services/users/auth";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -14,31 +16,21 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as ImagePicker from "expo-image-picker";
-import { authService } from "@/services/users/auth";
 
 export default function EditProfile() {
   const { showToast } = useToast();
   const { isDark } = useTheme();
-  const [user, setUser] = useState<User | null>(null);
+  const { user, setUser, refreshUser } = useUser();
   const [fullname, setFullname] = useState("");
   const [avatarUri, setAvatarUri] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const loadUserData = useCallback(async () => {
-    const userData = await AsyncStorage.getItem("user");
-    if (userData) {
-      const parsedUser = JSON.parse(userData);
-      setUser(parsedUser);
-      setFullname(parsedUser.fullname || "");
-      setAvatarUri(parsedUser.avatarUrl || "");
-    }
-  }, []);
-
   useEffect(() => {
-    loadUserData();
-  }, [loadUserData]);
+    if (user) {
+      setFullname(user.fullname || "");
+      setAvatarUri(user.avatarUrl || "");
+    }
+  }, [user]);
 
   const requestPermissions = async () => {
     const { status: cameraStatus } =
@@ -101,11 +93,11 @@ export default function EditProfile() {
   };
 
   const handleImagePicker = () => {
-    const options: Array<{
+    const options: {
       text: string;
       onPress?: () => Promise<void>;
       style?: "default" | "cancel" | "destructive";
-    }> = [
+    }[] = [
       {
         text: "Camera",
         onPress: pickImageFromCamera,
@@ -146,7 +138,11 @@ export default function EditProfile() {
     try {
       if (avatarUri) {
         const formData = new FormData();
-        formData.append("avatar", avatarUri);
+        formData.append("avatar", {
+          uri: avatarUri,
+          type: "image/jpeg", // hoặc suy luận từ đuôi file
+          name: "avatar.jpg",
+        } as any);
         formData.append("fullname", fullname.trim());
         formData.append("gender", user?.gender || "");
 
@@ -158,15 +154,17 @@ export default function EditProfile() {
         });
       }
 
-      if (user) {
-        const updatedUser = {
-          ...user,
-          fullname: fullname.trim(),
-          avatarUrl: avatarUri,
-        };
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
-      }
+      await refreshUser();
+
+      // if (user) {
+      //   const updatedUser = {
+      //     ...user,
+      //     fullname: fullname.trim(),
+      //     avatarUrl: avatarUri,
+      //   };
+      //   await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      //   setUser(updatedUser);
+      // }
 
       showToast("Profile updated successfully!", "success");
       router.back();
