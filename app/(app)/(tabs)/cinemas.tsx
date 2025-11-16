@@ -1,12 +1,15 @@
 // app/screens/Cinemas.tsx
+import { useToast } from "@/contexts/toastContext";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-
 import { useMemo, useState } from "react";
 import {
   FlatList,
   Image,
+  Linking,
+  Modal,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -21,6 +24,8 @@ type Cinema = {
   note?: string;
   city: string;
   isFav?: boolean;
+  latitude: number;
+  longitude: number;
 };
 
 const MOCK: Cinema[] = [
@@ -34,6 +39,8 @@ const MOCK: Cinema[] = [
     note: "Bạn vừa chọn rạp này",
     city: "TP.HCM",
     isFav: false,
+    latitude: 10.7559,
+    longitude: 106.6168,
   },
   {
     id: "cgv",
@@ -45,9 +52,11 @@ const MOCK: Cinema[] = [
     note: "Bạn vừa chọn rạp này",
     city: "TP.HCM",
     isFav: false,
+    latitude: 10.0452,
+    longitude: 105.7469,
   },
   {
-    id: "cgv-aeon-pt",
+    id: "cgv-aeon-p",
     name: "CGV Aeon HCM",
     brandLogo:
       "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
@@ -56,7 +65,45 @@ const MOCK: Cinema[] = [
     note: "Bạn vừa chọn rạp này",
     city: "TP.HCM",
     isFav: false,
+    latitude: 10.0422,
+    longitude: 105.7169,
   },
+  {
+    id: "cgv-aeon",
+    name: "CGV Aeon HCM",
+    brandLogo:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
+    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
+    distanceText: "- km",
+    note: "Bạn vừa chọn rạp này",
+    city: "Quảng Trị",
+    isFav: false,
+    latitude: 10.02,
+    longitude: 105.742,
+  },
+  {
+    id: "cgv-aeon-t",
+    name: "CGV Aeon HCM",
+    brandLogo:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
+    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
+    distanceText: "- km",
+    note: "Bạn vừa chọn rạp này",
+    city: "Cần Thơ",
+    isFav: false,
+    latitude: 11.0452,
+    longitude: 106.7469,
+  },
+];
+
+const CITIES = [
+  "TP.HCM",
+  "Hà Nội",
+  "Đà Nẵng",
+  "Cần Thơ",
+  "Quảng Trị",
+  "Quảng Bình",
+  "Sóc Trăng",
 ];
 
 export default function Cinemas() {
@@ -64,16 +111,28 @@ export default function Cinemas() {
   const [city, setCity] = useState("TP.HCM");
   const [data, setData] = useState(MOCK);
   const router = useRouter();
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const { showToast } = useToast();
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return data.filter(
-      (c) =>
-        c.city === city &&
+    console.log(
+      "City đang chọn:",
+      city,
+      "| Danh sách city trong data:",
+      data.map((d) => d.city)
+    );
+
+    return data.filter((c) => {
+      // Normalize chuỗi trước khi so sánh để tránh sai khác chữ hoa/thường hoặc khoảng trắng
+      const normalize = (s: string) => s.trim().toLowerCase();
+      return (
+        normalize(c.city) === normalize(city) &&
         (q.length === 0 ||
           c.name.toLowerCase().includes(q) ||
           c.address.toLowerCase().includes(q))
-    );
+      );
+    });
   }, [data, city, query]);
 
   const toggleFav = (id: string) =>
@@ -120,9 +179,7 @@ export default function Cinemas() {
             Rạp đề xuất ({results.length})
           </Text>
           <Pressable
-            onPress={() => {
-              // mở modal chọn khu vực nếu cần
-            }}
+            onPress={() => setShowCityPicker(true)}
             className="flex-row items-center bg-white px-3 h-7 rounded-full border border-gray-200"
           >
             <Ionicons name="location-outline" size={14} />
@@ -184,7 +241,17 @@ export default function Cinemas() {
 
               <Pressable
                 onPress={() => {
-                  // Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`)
+                  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
+                  Linking.openURL(url).catch(() =>
+                    showToast(
+                      "Không thể mở Google Maps trên thiết bị của bạn",
+                      "warning"
+                    )
+                  );
+                  // const url = `https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}&travelmode=driving`;
+                  // Linking.openURL(url).catch(() =>
+                  //   alert("Không thể mở Google Maps trên thiết bị của bạn")
+                  // );
                 }}
                 className="flex-row items-center mt-2"
               >
@@ -196,6 +263,52 @@ export default function Cinemas() {
             </Pressable>
           )}
         />
+
+        {/* Modal chọn thành phố */}
+        <Modal
+          visible={showCityPicker}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowCityPicker(false)}
+        >
+          <View className="flex-1 bg-black/40 justify-center items-center px-5">
+            <View className="bg-white w-full max-h-[70%] rounded-2xl p-5">
+              <Text className="text-lg font-bold mb-3 text-center">
+                Chọn thành phố
+              </Text>
+
+              {/* ✅ Bọc danh sách trong ScrollView để có thể cuộn */}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 12 }}
+              >
+                {CITIES.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => {
+                      setCity(c);
+                      setShowCityPicker(false);
+                    }}
+                    className={`p-3 rounded-lg mb-2 ${
+                      c === city ? "bg-pink-100" : "bg-gray-100"
+                    }`}
+                  >
+                    <Text className="text-center text-base">{c}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <Pressable
+                onPress={() => setShowCityPicker(false)}
+                className="mt-2 bg-gray-300 py-2 rounded-lg"
+              >
+                <Text className="text-center font-semibold text-gray-700">
+                  Đóng
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </View>
     </>
   );

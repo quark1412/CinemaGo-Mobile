@@ -1,4 +1,10 @@
 // app/(auth)/sign-in.tsx
+import { useTheme } from "@/contexts/themeContext";
+import { useToast } from "@/contexts/toastContext";
+import { useUser } from "@/contexts/userContext";
+import { authService } from "@/services/users/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -17,6 +23,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
   const router = useRouter();
+  const { login } = useUser();
+  const { isDark, toggleTheme } = useTheme();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -32,29 +41,29 @@ export default function SignIn() {
   useEffect(() => {
     (async () => {
       try {
-        // const compatible = await LocalAuthentication.hasHardwareAsync();
-        // const enrolled = await LocalAuthentication.isEnrolledAsync();
-        // if (compatible && enrolled) {
-        //   const types =
-        //     await LocalAuthentication.supportedAuthenticationTypesAsync();
-        //   // Ưu tiên Face ID nếu có, nếu không thì Touch ID
-        //   if (
-        //     types.includes(
-        //       LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
-        //     )
-        //   ) {
-        //     setBioLabel("Face ID");
-        //   } else if (
-        //     types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
-        //   ) {
-        //     setBioLabel("Touch ID");
-        //   } else {
-        //     setBioLabel("Biometric");
-        //   }
-        //   setBioSupported(true);
-        // } else {
-        //   setBioSupported(false);
-        // }
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (compatible && enrolled) {
+          const types =
+            await LocalAuthentication.supportedAuthenticationTypesAsync();
+          // Ưu tiên Face ID nếu có, nếu không thì Touch ID
+          if (
+            types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
+          ) {
+            setBioLabel("Touch ID"); // hoặc "Vân tay"
+          } else if (
+            types.includes(
+              LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
+            )
+          ) {
+            setBioLabel("Face ID"); // hoặc "Khuôn mặt"
+          } else {
+            setBioLabel("Biometric");
+          }
+          setBioSupported(true);
+        } else {
+          setBioSupported(false);
+        }
       } finally {
         setCheckingBio(false);
       }
@@ -65,8 +74,12 @@ export default function SignIn() {
     if (!email || !pwd) return;
     try {
       setLoading(true);
-      // TODO: call your auth API here
+      await login(email, pwd);
+      showToast("Đăng nhập thành công", "success");
       router.replace("/(app)/(tabs)/account");
+    } catch (err: any) {
+      console.log(err.message);
+      showToast("Đăng nhập không thành công", "error");
     } finally {
       setLoading(false);
     }
@@ -74,16 +87,40 @@ export default function SignIn() {
 
   const onBiometric = async () => {
     try {
-      // Lưu ý: bạn có thể combine với email đã nhập (nếu cần xác định account)
-      // const result = await LocalAuthentication.authenticateAsync({
-      //   promptMessage: `Đăng nhập bằng ${bioLabel}`,
-      //   cancelLabel: "Hủy",
-      //   fallbackEnabled: true, // cho phép PIN/Pattern nếu được hệ thống hỗ trợ
-      // });
-      // if (result.success) {
-      //   // TODO: xác thực session với server nếu cần (ví dụ exchange 1 token trusted)
-      //   router.replace("/(app)/(tabs)/account");
-      // }
+      //Lưu ý: bạn có thể combine với email đã nhập (nếu cần xác định account)
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Đăng nhập bằng ${bioLabel}`,
+        cancelLabel: "Hủy",
+        // fallbackEnabled: true, // cho phép PIN/Pattern nếu được hệ thống hỗ trợ
+      });
+      if (result.success) {
+        if (!result.success) return;
+
+        // 1. Lấy refresh token lưu cho biometrics
+        const storedRefreshToken = await getBiometricRefreshToken();
+        if (!storedRefreshToken) {
+          showToast(
+            "Chưa bật đăng nhập sinh trắc học hoặc phiên đã hết hạn",
+            "error"
+          );
+          return;
+        }
+
+        // 2. Gọi API để login/refresh từ refreshToken
+        const { user, accessToken, refreshToken } =
+          await authService.loginWithRefreshToken(storedRefreshToken);
+
+        // 3. Lưu token & user local
+        await AsyncStorage.setItem("accessToken", accessToken);
+        await AsyncStorage.setItem("refreshToken", refreshToken);
+        await AsyncStorage.setItem("user", JSON.stringify(user));
+
+        // 4. Cập nhật UserContext
+        setUser(user);
+        // hoặc nếu bạn đã có sẵn refreshUser() gọi /me:
+        // await refreshUser();
+        router.replace("/(app)/(tabs)/account");
+      }
     } catch (e) {
       // có thể hiển thị toast lỗi nhẹ nhàng
     }
@@ -108,7 +145,7 @@ export default function SignIn() {
         }
       />
 
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className={`flex-1 `}>
         <KeyboardAvoidingView
           behavior={Platform.select({ ios: "padding", android: undefined })}
           className="flex-1 px-6"
@@ -132,18 +169,20 @@ export default function SignIn() {
               </View>
 
               {/* Card */}
-              <View className="mt-10  rounded-2xl bg-white/95 p-5 shadow-2xl border border-yellow-400/40">
+              <View
+                className={`mt-10  rounded-2xl ${isDark ? "dark" : "light"} bg-background p-5 shadow-2xl border border-yellow-400/40`}
+              >
                 {/* Title center */}
-                <Text className="text-2xl font-extrabold text-black text-center">
+                <Text className="text-2xl font-extrabold text-foreground text-center">
                   Đăng nhập
                 </Text>
-                <Text className="text-black/60 mt-1 text-center">
+                <Text className="text-foreground mt-1 text-center">
                   Chào mừng trở lại!
                 </Text>
 
                 {/* Email */}
                 <View className="mt-6">
-                  <Text className="text-[13px] text-black/70 mb-2">
+                  <Text className="text-[13px] text-foreground mb-2">
                     Tên đăng nhập
                   </Text>
                   <View className="rounded-xl border border-black/10 bg-white">
@@ -163,7 +202,7 @@ export default function SignIn() {
 
                 {/* Password */}
                 <View className="mt-4">
-                  <Text className="text-[13px] text-black/70 mb-2">
+                  <Text className="text-[13px] text-foreground mb-2">
                     Mật khẩu
                   </Text>
                   <View className="flex-row items-center rounded-xl border border-black/10 bg-white">
@@ -218,9 +257,13 @@ export default function SignIn() {
 
                 {/* Divider */}
                 <View className="flex-row items-center mt-6">
-                  <View className="h-px flex-1 bg-black/10" />
-                  <Text className="mx-3 text-black/40 text-xs">hoặc</Text>
-                  <View className="h-px flex-1 bg-black/10" />
+                  <View
+                    className={`h-px flex-1 ${isDark ? "dark" : "light"} bg-background`}
+                  />
+                  <Text className="mx-3 text-foreground text-xs">hoặc</Text>
+                  <View
+                    className={`h-px flex-1 ${isDark ? "dark" : "light"} bg-background`}
+                  />
                 </View>
 
                 {/* Biometric sign-in */}
@@ -242,7 +285,7 @@ export default function SignIn() {
 
                 {/* Đăng ký */}
                 <View className="mt-6 flex-row justify-center">
-                  <Text className="text-black/60 mr-1">
+                  <Text className="text-foreground  mr-1">
                     Bạn chưa có tài khoản?
                   </Text>
                   <Link

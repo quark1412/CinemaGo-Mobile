@@ -9,6 +9,7 @@
     "scheme": "cinemagomobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cinemago.mobile"

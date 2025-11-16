@@ -1,4 +1,7 @@
 // app/(auth)/sign-up.tsx
+import { useTheme } from "@/contexts/themeContext";
+import { useToast } from "@/contexts/toastContext";
+import { authService } from "@/services/users/auth";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -17,6 +20,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignUp() {
   const router = useRouter();
+  const { showToast } = useToast();
+  const { isDark, toggleTheme } = useTheme();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,6 +35,8 @@ export default function SignUp() {
   // errors
   const [errName, setErrName] = useState<string | null>(null);
   const [errEmail, setErrEmail] = useState<string | null>(null);
+  const [gender, setGender] = useState<"male" | "female" | "other">("male");
+
   const [errPwd, setErrPwd] = useState<string | null>(null);
   const [errPwd2, setErrPwd2] = useState<string | null>(null);
 
@@ -64,13 +71,34 @@ export default function SignUp() {
 
   const onSubmit = async () => {
     if (!validate()) return;
+
     try {
       setLoading(true);
-      // TODO: call your auth API
-      // await authService.signUp({ fullName, email, password: pwd });
 
-      // Sau khi đăng ký thành công → có thể auto login, hoặc chuyển sang sign-in
-      router.replace("/(app)/sign-in"); // hoặc: router.replace("/(auth)/sign-in")
+      const payload = {
+        email,
+        fullname: fullName, // BE yêu cầu key fullname
+        password: pwd,
+        gender: gender, // thêm gender
+      };
+
+      const response = await authService.signup(
+        payload.email,
+        payload.fullname,
+        payload.password,
+        payload.gender
+      );
+
+      // Sau khi đăng ký thành công → điều hướng sign-in
+      console.log(response);
+
+      const userId = response.data.data.id;
+      router.replace({
+        pathname: "/(app)/auth/check-mail",
+        params: { userId, email },
+      });
+    } catch (err) {
+      showToast("Đăng kí thất bại", "error");
     } finally {
       setLoading(false);
     }
@@ -81,6 +109,7 @@ export default function SignUp() {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
     pwd.length >= 6 &&
     pwd2 === pwd &&
+    gender !== null &&
     acceptTos &&
     !loading;
 
@@ -125,6 +154,7 @@ export default function SignUp() {
               </View>
 
               {/* Card */}
+              {/* Card */}
               <View className="mt-5 w-full max-w-[560px] self-center rounded-2xl bg-white/95 p-6 shadow-2xl border border-yellow-400/40">
                 <Text className="text-2xl font-extrabold text-black text-center">
                   Đăng ký
@@ -133,7 +163,7 @@ export default function SignUp() {
                   Chỉ mất một phút để bắt đầu đặt vé!
                 </Text>
 
-                {/* Full name */}
+                {/* Full Name */}
                 <View className="mt-6">
                   <Text className="text-[14px] text-black/70 mb-2">
                     Họ và tên
@@ -145,7 +175,6 @@ export default function SignUp() {
                       placeholder="Nguyễn Văn A"
                       placeholderTextColor="#9ca3af"
                       className="px-4 h-12 text-[16px] text-black"
-                      returnKeyType="next"
                     />
                   </View>
                   {!!errName && (
@@ -163,10 +192,8 @@ export default function SignUp() {
                       placeholder="you@example.com"
                       placeholderTextColor="#9ca3af"
                       keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
                       className="px-4 h-12 text-[16px] text-black"
-                      returnKeyType="next"
+                      autoCapitalize="none"
                     />
                   </View>
                   {!!errEmail && (
@@ -174,6 +201,35 @@ export default function SignUp() {
                       {errEmail}
                     </Text>
                   )}
+                </View>
+
+                {/* Gender */}
+                <View className="mt-4">
+                  <Text className="text-[14px] text-black/70 mb-2">
+                    Giới tính
+                  </Text>
+
+                  <View className="flex-row justify-between">
+                    {[
+                      { label: "Nam", value: "male" },
+                      { label: "Nữ", value: "female" },
+                      { label: "Khác", value: "other" },
+                    ].map((g) => (
+                      <Pressable
+                        key={g.value}
+                        onPress={() => setGender(g.value as any)}
+                        className={`px-4 py-3 rounded-xl border flex-1 mx-1 
+                              ${gender === g.value ? "bg-yellow-400 border-yellow-500" : "bg-white border-black/20"}`}
+                      >
+                        <Text
+                          className={`text-center font-medium 
+                            ${gender === g.value ? "text-black" : "text-black/60"}`}
+                        >
+                          {g.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
 
                 {/* Password */}
@@ -188,9 +244,7 @@ export default function SignUp() {
                       placeholder="Tối thiểu 6 ký tự"
                       placeholderTextColor="#9ca3af"
                       secureTextEntry={!showPwd}
-                      autoCapitalize="none"
                       className="flex-1 px-4 h-12 text-[16px] text-black"
-                      returnKeyType="next"
                     />
                     <Pressable
                       onPress={() => setShowPwd(!showPwd)}
@@ -218,10 +272,7 @@ export default function SignUp() {
                       placeholder="Nhập lại mật khẩu"
                       placeholderTextColor="#9ca3af"
                       secureTextEntry={!showPwd2}
-                      autoCapitalize="none"
                       className="flex-1 px-4 h-12 text-[16px] text-black"
-                      returnKeyType="done"
-                      onSubmitEditing={onSubmit}
                     />
                     <Pressable
                       onPress={() => setShowPwd2(!showPwd2)}
@@ -241,13 +292,10 @@ export default function SignUp() {
                 <Pressable
                   onPress={() => setAcceptTos(!acceptTos)}
                   className="mt-5 flex-row items-center"
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: acceptTos }}
-                  hitSlop={10}
                 >
                   <View
                     className={`w-5 h-5 mr-2 rounded border items-center justify-center
-                                ${acceptTos ? "bg-[#eab308] border-[#eab308]" : "bg-white border-black/30"}`}
+                  ${acceptTos ? "bg-[#eab308] border-[#eab308]" : "bg-white border-black/30"}`}
                   >
                     {acceptTos && (
                       <Text className="text-black text-[12px] leading-4">
@@ -273,9 +321,8 @@ export default function SignUp() {
                 <Pressable
                   onPress={onSubmit}
                   disabled={!canSubmit}
-                  className={`mt-6 h-12 rounded-xl px-4 items-center justify-center ${
-                    canSubmit ? "bg-[#eab308]" : "bg-yellow-300/60"
-                  }`}
+                  className={`mt-6 h-12 rounded-xl items-center justify-center 
+      ${canSubmit ? "bg-[#eab308]" : "bg-yellow-300/60"}`}
                 >
                   <Text
                     className={`font-semibold ${canSubmit ? "text-black" : "text-black/60"}`}
@@ -284,7 +331,7 @@ export default function SignUp() {
                   </Text>
                 </Pressable>
 
-                {/* Switch to Sign in */}
+                {/* Switch */}
                 <View className="mt-6 flex-row justify-center">
                   <Text className="text-black/60 mr-1">Đã có tài khoản?</Text>
                   <Link
@@ -299,7 +346,7 @@ export default function SignUp() {
               {/* Footer */}
               <View className="items-center mt-3">
                 <Text className="text-white/75 text-xs">
-                  © {new Date().getFullYear()} CinemaGoGo
+                  © {new Date().getFullYear()} CinemaGo
                 </Text>
               </View>
             </KeyboardAwareScrollView>
