@@ -1,18 +1,13 @@
-import { ThemeProvider } from "@/contexts/themeContext";
-import { ToastProvider } from "@/contexts/toastContext";
-import { UserProvider } from "@/contexts/userContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+
+import { ThemeProvider } from "@/contexts/themeContext";
+import { ToastProvider } from "@/contexts/toastContext";
+import { UserProvider } from "@/contexts/userContext";
 import { StatusBar } from "react-native";
 import "../global.css";
-
-import {
-  disableBiometricLogin,
-  isBiometricEnabled,
-} from "@/services/users/biometric";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,23 +27,6 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, error]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const enabled = await isBiometricEnabled();
-        if (!enabled) return;
-
-        const currentRefreshToken = await AsyncStorage.getItem("refreshToken");
-
-        if (!currentRefreshToken) {
-          await disableBiometricLogin();
-        }
-      } catch (e) {
-        console.log("Biometric init sync error:", e);
-      }
-    })();
-  }, []);
 
   if (!loaded && !error) {
     return null;

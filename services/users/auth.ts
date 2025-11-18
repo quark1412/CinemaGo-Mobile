@@ -1,8 +1,4 @@
 import instance from "@/configs/axiosConfig";
-import {
-  isBiometricEnabled,
-  updateBiometricToken,
-} from "@/services/users/biometric";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const authService = {
@@ -29,23 +25,6 @@ export const authService = {
       console.log("Login service error", error);
       throw error;
     }
-  },
-
-  loginWithRefreshToken: async (refreshToken: string) => {
-    const res = await instance.post("/auth/refresh-token", { refreshToken }, {
-      requiresAuth: false,
-    } as any);
-
-    const { accessToken, refreshToken: newRefreshToken } = res.data;
-
-    await AsyncStorage.setItem("accessToken", accessToken);
-    await AsyncStorage.setItem("refreshToken", newRefreshToken);
-
-    if (await isBiometricEnabled()) {
-      await updateBiometricToken(newRefreshToken);
-    }
-
-    return { accessToken, refreshToken: newRefreshToken };
   },
 
   signup: async (
