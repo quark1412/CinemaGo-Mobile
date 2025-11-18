@@ -3,10 +3,6 @@ import { useTheme } from "@/contexts/themeContext";
 import { useToast } from "@/contexts/toastContext";
 import { useUser } from "@/contexts/userContext";
 import { authService } from "@/services/users/auth";
-import {
-  disableBiometricLogin,
-  signInWithBiometric,
-} from "@/services/users/biometric";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Link, useRouter } from "expo-router";
@@ -27,7 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
   const router = useRouter();
-  const { login, refreshUser } = useUser();
+  const { login } = useUser();
   const { isDark, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
@@ -91,27 +87,42 @@ export default function SignIn() {
 
   const onBiometric = async () => {
     try {
-      const storedRefreshToken = await signInWithBiometric();
-      console.log("Biometric refresh token:", storedRefreshToken);
-      if (!storedRefreshToken) {
-        showToast(
-          "Chưa bật đăng nhập sinh trắc học hoặc phiên đã hết hạn",
-          "error"
-        );
-        return;
+      //Lưu ý: bạn có thể combine với email đã nhập (nếu cần xác định account)
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Đăng nhập bằng ${bioLabel}`,
+        cancelLabel: "Hủy",
+        // fallbackEnabled: true, // cho phép PIN/Pattern nếu được hệ thống hỗ trợ
+      });
+      if (result.success) {
+        if (!result.success) return;
+
+        // 1. Lấy refresh token lưu cho biometrics
+        const storedRefreshToken = await getBiometricRefreshToken();
+        if (!storedRefreshToken) {
+          showToast(
+            "Chưa bật đăng nhập sinh trắc học hoặc phiên đã hết hạn",
+            "error"
+          );
+          return;
+        }
+
+        // 2. Gọi API để login/refresh từ refreshToken
+        const { user, accessToken, refreshToken } =
+          await authService.loginWithRefreshToken(storedRefreshToken);
+
+        // 3. Lưu token & user local
+        await AsyncStorage.setItem("accessToken", accessToken);
+        await AsyncStorage.setItem("refreshToken", refreshToken);
+        await AsyncStorage.setItem("user", JSON.stringify(user));
+
+        // 4. Cập nhật UserContext
+        setUser(user);
+        // hoặc nếu bạn đã có sẵn refreshUser() gọi /me:
+        // await refreshUser();
+        router.replace("/(app)/(tabs)/account");
       }
-
-      await authService.loginWithRefreshToken(storedRefreshToken);
-
-      await refreshUser();
-
-      router.replace("/(app)/(tabs)/account");
     } catch (e) {
-      await disableBiometricLogin();
-      await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
-      showToast("Phiên sinh trắc học đã hết hạn, hãy đăng nhập lại.", "error");
-      router.replace("/auth/sign-in");
-      return;
+      // có thể hiển thị toast lỗi nhẹ nhàng
     }
   };
 

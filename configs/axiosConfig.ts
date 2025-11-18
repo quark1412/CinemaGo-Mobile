@@ -50,17 +50,13 @@ instance.interceptors.request.use(
         }
       }
 
-      if (!refreshToken) {
-        return req;
-      }
-
       try {
-        const response = await axios.post(`${baseURL}/auth/refresh-token`, {
+        const response = await axios.post(`${baseURL}/auth/refreshToken`, {
           refreshToken,
         });
 
         const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
-          response.data;
+          response.data.data;
 
         await AsyncStorage.setItem("accessToken", newAccessToken);
         await AsyncStorage.setItem("refreshToken", newRefreshToken);
@@ -74,10 +70,9 @@ instance.interceptors.request.use(
         return req;
       }
     } catch (error: any) {
-      console.log(
-        "API Error:",
-        error.response?.status,
-        error.response?.data || error.message
+      console.error(
+        "Request interceptor error:",
+        error?.message || "Unknown error"
       );
       return req;
     }

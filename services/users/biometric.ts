@@ -3,7 +3,7 @@ import * as LocalAuth from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
 const FLAG = "biometric_enabled";
-const SECRET = "BIOMETRIC_REFRESH_TOKEN";
+const SECRET = "refresh_token"; // hoặc session key
 
 export async function canUseBiometric() {
   const hw = await LocalAuth.hasHardwareAsync();
@@ -12,25 +12,19 @@ export async function canUseBiometric() {
 }
 
 export async function enableBiometricLogin(refreshToken: string) {
-  try {
-    const canUse = await canUseBiometric();
-    if (!canUse) return false;
+  // Xác thực 1 lần để bật
+  const ok = await LocalAuth.authenticateAsync({
+    promptMessage: "Xác thực để bật đăng nhập vân tay",
+    cancelLabel: "Hủy",
+  });
+  if (!ok.success) return false;
 
-    const ok = await LocalAuth.authenticateAsync({
-      promptMessage: "Xác thực để bật đăng nhập sinh trắc học",
-      cancelLabel: "Hủy",
-    });
-    if (!ok.success) return false;
-
-    console.log("refreshtoken nè: ", refreshToken);
-
-    await SecureStore.setItemAsync(SECRET, refreshToken, {});
-    await SecureStore.setItemAsync(FLAG, "1");
-    return true;
-  } catch (e) {
-    console.log("enableBiometricLogin error", e);
-    return false;
-  }
+  // Lưu token an toàn, yêu cầu vân tay mỗi lần đọc
+  await SecureStore.setItemAsync(SECRET, refreshToken, {
+    requireAuthentication: true, // bắt buộc vân tay/FaceID khi đọc
+  });
+  await SecureStore.setItemAsync(FLAG, "1");
+  return true;
 }
 
 export async function disableBiometricLogin() {
@@ -43,23 +37,9 @@ export async function isBiometricEnabled() {
 }
 
 export async function signInWithBiometric(): Promise<string | null> {
-  const canUse = await canUseBiometric();
-  if (!canUse) return null;
-
-  const ok = await LocalAuth.authenticateAsync({
-    promptMessage: "Đăng nhập bằng sinh trắc học",
-    cancelLabel: "Hủy",
+  // Trả về refreshToken nếu xác thực thành công
+  const token = await SecureStore.getItemAsync(SECRET, {
+    requireAuthentication: true, // hiện prompt vân tay
   });
-  if (!ok.success) return null;
-
-  const token = await SecureStore.getItemAsync(SECRET);
   return token ?? null;
-}
-
-export async function updateBiometricToken(refreshToken: string) {
-  try {
-    await SecureStore.setItemAsync(SECRET, refreshToken, {});
-  } catch (e) {
-    console.log("updateBiometricToken error", e);
-  }
 }
