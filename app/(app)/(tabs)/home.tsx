@@ -135,7 +135,7 @@ export default function Home() {
   const x = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
 
-  // ✅ tạo loop data
+  //  tạo loop data
   const LOOP_DATA = [...featured, ...featured, ...featured];
   const START_INDEX = featured.length;
   const ITEM_SIZE = CARD_W + SPACING;

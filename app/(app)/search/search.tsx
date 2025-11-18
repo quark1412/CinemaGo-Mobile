@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CinemaItem } from "./CinemaItem";
 import { mockCinemas, mockMovies } from "./mockdata";
 import { MovieItem } from "./MovieItem";
 
@@ -79,58 +78,32 @@ export default function SearchScreen() {
           </View>
 
           {/* Result */}
-          {tab === "phim" ? (
-            <FlatList
-              data={filteredMovies}
-              keyExtractor={(item) => `movie-${item.id}`}
-              renderItem={({ item }) => (
-                <MovieItem
-                  id={item.id}
-                  title={item.title}
-                  year={item.year}
-                  status={item.status}
-                  poster={item.poster}
-                  onPress={(id) =>
-                    router.push({
-                      pathname: "/(app)/movies/[id]",
-                      params: { id },
-                    })
-                  }
-                  onBookPress={(id) =>
-                    router.push({
-                      pathname: "/(app)/movies/[id]",
-                      params: { id },
-                    })
-                  }
-                />
-              )}
-            />
-          ) : (
-            <FlatList
-              data={filteredCinemas}
-              keyExtractor={(item) => `cinema-${item.id}`}
-              renderItem={({ item }) => (
-                <CinemaItem
-                  id={item.id}
-                  name={item.name}
-                  address={item.address}
-                  image={item.image}
-                  onPress={(id) =>
-                    router.push({
-                      pathname: "/(app)/cinema/[id]",
-                      params: { id },
-                    })
-                  }
-                  onShowtimePress={(id) =>
-                    router.push({
-                      pathname: "/(app)/showtimes/[id]",
-                      params: { id },
-                    })
-                  }
-                />
-              )}
-            />
-          )}
+
+          <FlatList
+            data={filteredMovies}
+            keyExtractor={(item) => `movie-${item.id}`}
+            renderItem={({ item }) => (
+              <MovieItem
+                id={item.id}
+                title={item.title}
+                year={item.year}
+                status={item.status}
+                poster={item.poster}
+                onPress={(id) =>
+                  router.push({
+                    pathname: "/(app)/movies/[id]",
+                    params: { id },
+                  })
+                }
+                onBookPress={(id) =>
+                  router.push({
+                    pathname: "/(app)/movies/[id]",
+                    params: { id },
+                  })
+                }
+              />
+            )}
+          />
         </View>
       </SafeAreaView>
     </>
