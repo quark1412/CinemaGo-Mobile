@@ -1,10 +1,10 @@
-import axios, { InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { jwtDecode } from "jwt-decode";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import dayjs from "dayjs";
+import { jwtDecode } from "jwt-decode";
 
 const baseURL =
-  /* process.env.EXPO_PUBLIC_BASE_URL || */ "http://192.168.1.6:8000/v1";
+  process.env.EXPO_PUBLIC_BASE_URL || "http://192.168.16.86:8000/v1";
 console.log(process.env.EXPO_PUBLIC_BASE_URL);
 
 const instance = axios.create({

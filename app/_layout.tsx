@@ -1,13 +1,13 @@
-import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
 import { Slot } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
 
-import "../global.css";
-import { StatusBar } from "react-native";
-import { ToastProvider } from "@/contexts/toastContext";
 import { ThemeProvider } from "@/contexts/themeContext";
+import { ToastProvider } from "@/contexts/toastContext";
+import { UserProvider } from "@/contexts/userContext";
+import { StatusBar } from "react-native";
+import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,8 +36,10 @@ export default function RootLayout() {
     // <SessionProvider>
     <ThemeProvider>
       <ToastProvider>
-        <StatusBar />
-        <Slot />
+        <UserProvider>
+          <StatusBar />
+          <Slot />
+        </UserProvider>
       </ToastProvider>
     </ThemeProvider>
     // </SessionProvider>
