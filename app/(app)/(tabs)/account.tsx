@@ -59,8 +59,6 @@ export default function Account() {
         showToast("Thiết bị chưa sẵn sàng cho Face/Touch ID");
         return;
       }
-
-      // Lấy refresh_token hiện tại (hoặc từ session của bạn)
       const currentRefreshToken =
         (await AsyncStorage.getItem("refreshToken")) || "";
       if (!currentRefreshToken) {
@@ -79,9 +77,8 @@ export default function Account() {
   // Đăng xuất
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove(["user", "accessToken", "refreshToken"]);
-    // Nếu muốn tắt luôn sinh trắc học khi logout:
-    await disableBiometricLogin().catch(() => {});
-    router.replace("/auth/sign-in"); // nếu (auth) là group
+
+    router.replace("/auth/sign-in");
   };
 
   return (
