@@ -21,6 +21,7 @@ export interface Movie {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  status: string;
 }
 
 export interface GetMoviesParams {
