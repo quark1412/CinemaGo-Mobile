@@ -22,6 +22,8 @@ import {
   DateOption,
 } from "@/types/showtime";
 import { useToast } from "@/contexts/toastContext";
+import { useTheme } from "@/contexts/themeContext";
+import { generateDateOptions } from "@/utils/dayUtils";
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +37,7 @@ export default function ShowtimeSelectionScreen() {
   const { id: movieId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { showToast } = useToast();
+  const { isDark } = useTheme();
 
   // State management
   const [loading, setLoading] = useState(true);
@@ -55,33 +58,9 @@ export default function ShowtimeSelectionScreen() {
   >([]);
   const [loadingFoodDrinks, setLoadingFoodDrinks] = useState(false);
 
-  // Generate date options (today + next 6 days)
+  // Generate date options
   const dateOptions = useMemo<DateOption[]>(() => {
-    const options: DateOption[] = [];
-    const today = new Date();
-
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-
-      const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-      const dayOfWeek = i === 0 ? "Hôm nay" : dayNames[date.getDay()];
-      const dayOfMonth = date.getDate().toString();
-      const month = (date.getMonth() + 1).toString();
-      const fullDate = date.toISOString().split("T")[0];
-
-      options.push({
-        date,
-        dayOfWeek,
-        dayOfMonth:
-          i === 0
-            ? `${dayOfMonth}/${month}`
-            : `${dayOfWeek}, ${dayOfMonth}/${month}`,
-        fullDate,
-      });
-    }
-
-    return options;
+    return generateDateOptions();
   }, []);
 
   // Filter showtimes by selected date
@@ -333,35 +312,51 @@ export default function ShowtimeSelectionScreen() {
     }
 
     if (seat.status === SeatStatus.BOOKED) {
-      return "w-8 h-8 mx-1 rounded bg-gray-600 border border-gray-700 opacity-50";
+      return isDark
+        ? "w-8 h-8 mx-1 rounded bg-gray-600 border border-gray-700 opacity-50"
+        : "w-8 h-8 mx-1 rounded bg-gray-400 border border-gray-500 opacity-50";
     }
 
     if (seat.type === SeatType.VIP) {
       return "w-8 h-8 mx-1 rounded border-2 border-yellow-500 bg-transparent";
     }
 
-    return "w-8 h-8 mx-1 rounded bg-gray-700 border border-gray-600";
+    return isDark
+      ? "w-8 h-8 mx-1 rounded bg-gray-700 border border-gray-600"
+      : "w-8 h-8 mx-1 rounded bg-gray-300 border border-gray-400";
   };
+
+  // Theme-aware colors
+  const bgColor = isDark ? "bg-slate-950" : "bg-white";
+  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
+  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
+  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
+  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
+  const iconColor = isDark ? "#fff" : "#0f172a";
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-950">
+      <SafeAreaView className={`flex-1 ${bgColor}`}>
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#e11d48" />
-          <Text className="text-slate-400 mt-4 text-base">Đang tải...</Text>
+          <Text className={`${textMuted} mt-4 text-base`}>Đang tải...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950" edges={["top"]}>
+    <SafeAreaView className={`flex-1 ${bgColor}`} edges={["top"]}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-slate-800">
+      <View
+        className={`flex-row items-center justify-between px-4 py-4 border-b ${borderColor}`}
+      >
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={iconColor} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold text-white">Chọn vé</Text>
+        <Text className={`text-lg font-semibold ${textColor}`}>Chọn vé</Text>
         <View className="w-6" />
       </View>
 
@@ -371,8 +366,8 @@ export default function ShowtimeSelectionScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         {/* Date Selection Section */}
-        <View className="py-5 border-b border-slate-800">
-          <Text className="text-lg font-semibold text-white px-4 mb-4">
+        <View className={`py-5 border-b ${borderColor}`}>
+          <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
             Chọn Suất Chiếu
           </Text>
           <ScrollView
@@ -386,7 +381,7 @@ export default function ShowtimeSelectionScreen() {
                 className={`px-4 py-3 mr-3 rounded-xl border-2 ${
                   selectedDate?.fullDate === date.fullDate
                     ? "bg-red-600 border-red-600"
-                    : "bg-slate-800 border-slate-700"
+                    : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
                 }`}
                 onPress={() => handleDateSelect(date)}
               >
@@ -394,7 +389,7 @@ export default function ShowtimeSelectionScreen() {
                   className={`text-sm font-semibold mb-1 ${
                     selectedDate?.fullDate === date.fullDate
                       ? "text-white"
-                      : "text-slate-400"
+                      : textMuted
                   }`}
                 >
                   {date.dayOfWeek}
@@ -403,7 +398,7 @@ export default function ShowtimeSelectionScreen() {
                   className={`text-lg font-bold ${
                     selectedDate?.fullDate === date.fullDate
                       ? "text-white"
-                      : "text-white"
+                      : textColor
                   }`}
                 >
                   {date.dayOfMonth.includes("/")
@@ -418,7 +413,7 @@ export default function ShowtimeSelectionScreen() {
           {selectedDate && (
             <View className="px-4 mt-4">
               {filteredShowtimes.length === 0 ? (
-                <Text className="text-slate-400 text-center py-4">
+                <Text className={`${textMuted} text-center py-4`}>
                   Không có suất chiếu cho ngày này
                 </Text>
               ) : (
@@ -433,7 +428,7 @@ export default function ShowtimeSelectionScreen() {
                       className={`px-5 py-3 mr-3 mb-3 rounded-xl border-2 ${
                         selectedShowtime?.id === showtime.id
                           ? "bg-red-600 border-red-600"
-                          : "bg-slate-800 border-slate-700"
+                          : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
                       }`}
                       onPress={() => handleShowtimeSelect(showtime)}
                     >
@@ -441,7 +436,7 @@ export default function ShowtimeSelectionScreen() {
                         className={`text-base font-bold ${
                           selectedShowtime?.id === showtime.id
                             ? "text-white"
-                            : "text-white"
+                            : textColor
                         }`}
                       >
                         {new Date(showtime.startTime).toLocaleTimeString(
@@ -463,8 +458,8 @@ export default function ShowtimeSelectionScreen() {
 
         {/* Seat Selection Section */}
         {selectedShowtime && (
-          <View className="py-5 border-b border-slate-800">
-            <Text className="text-lg font-semibold text-white px-4 mb-4">
+          <View className={`py-5 border-b ${borderColor}`}>
+            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
               Chọn Ghế Ngồi
             </Text>
 
@@ -477,7 +472,9 @@ export default function ShowtimeSelectionScreen() {
                 {/* Screen Indicator */}
                 <View className="items-center mb-6 px-4">
                   <View className="w-full h-1 bg-red-600 rounded mb-2" />
-                  <Text className="text-xs font-semibold text-slate-400 tracking-wider">
+                  <Text
+                    className={`text-xs font-semibold ${textMuted} tracking-wider`}
+                  >
                     MÀN HÌNH
                   </Text>
                 </View>
@@ -516,7 +513,9 @@ export default function ShowtimeSelectionScreen() {
                                   )}
                                   {!isSelected &&
                                     seat.status === SeatStatus.AVAILABLE && (
-                                      <Text className="text-[8px] text-white font-semibold">
+                                      <Text
+                                        className={`text-[8px] ${isDark ? "text-white" : "text-slate-900"} font-semibold`}
+                                      >
                                         {seat.seatNumber}
                                       </Text>
                                     )}
@@ -533,25 +532,29 @@ export default function ShowtimeSelectionScreen() {
                 {/* Legend */}
                 <View className="flex-row flex-wrap justify-center gap-4 mt-6 px-4">
                   <View className="flex-row items-center gap-2">
-                    <View className="w-4 h-4 rounded bg-slate-700 border border-slate-600" />
-                    <Text className="text-xs text-slate-400">Trống</Text>
+                    <View
+                      className={`w-4 h-4 rounded ${isDark ? "bg-slate-700 border border-slate-600" : "bg-slate-300 border border-slate-400"}`}
+                    />
+                    <Text className={`text-xs ${textMuted}`}>Trống</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
                     <View className="w-4 h-4 rounded bg-red-600 border border-red-700" />
-                    <Text className="text-xs text-slate-400">Đang chọn</Text>
+                    <Text className={`text-xs ${textMuted}`}>Đang chọn</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
-                    <View className="w-4 h-4 rounded bg-gray-600 border border-gray-700 opacity-50" />
-                    <Text className="text-xs text-slate-400">Đã bán</Text>
+                    <View
+                      className={`w-4 h-4 rounded ${isDark ? "bg-gray-600 border border-gray-700" : "bg-gray-400 border border-gray-500"} opacity-50`}
+                    />
+                    <Text className={`text-xs ${textMuted}`}>Đã bán</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
                     <View className="w-4 h-4 rounded border-2 border-yellow-500 bg-transparent" />
-                    <Text className="text-xs text-slate-400">VIP</Text>
+                    <Text className={`text-xs ${textMuted}`}>VIP</Text>
                   </View>
                 </View>
               </>
             ) : (
-              <Text className="text-slate-400 text-center py-4">
+              <Text className={`${textMuted} text-center py-4`}>
                 Không có sơ đồ ghế
               </Text>
             )}
@@ -559,8 +562,8 @@ export default function ShowtimeSelectionScreen() {
         )}
 
         {/* Combo Selection Section */}
-        <View className="py-5 border-b border-slate-800">
-          <Text className="text-lg font-semibold text-white px-4 mb-4">
+        <View className={`py-5 border-b ${borderColor}`}>
+          <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
             Chọn Bắp Nước
           </Text>
 
@@ -575,7 +578,7 @@ export default function ShowtimeSelectionScreen() {
                 return (
                   <View
                     key={foodDrink.id}
-                    className="flex-row items-center mb-4 p-4 bg-slate-800 rounded-xl"
+                    className={`flex-row items-center mb-4 p-4 ${cardBg} rounded-xl`}
                   >
                     <Image
                       source={{ uri: foodDrink.image }}
@@ -583,10 +586,12 @@ export default function ShowtimeSelectionScreen() {
                       resizeMode="cover"
                     />
                     <View className="flex-1">
-                      <Text className="text-white font-semibold text-base mb-1">
+                      <Text
+                        className={`${textColor} font-semibold text-base mb-1`}
+                      >
                         {foodDrink.name}
                       </Text>
-                      <Text className="text-slate-400 text-sm mb-2">
+                      <Text className={`${textMuted} text-sm mb-2`}>
                         {foodDrink.description}
                       </Text>
                       <Text className="text-red-500 font-bold text-base">
@@ -598,15 +603,19 @@ export default function ShowtimeSelectionScreen() {
                     </View>
                     <View className="flex-row items-center gap-3">
                       <TouchableOpacity
-                        className="w-8 h-8 rounded-full bg-slate-700 items-center justify-center"
+                        className={`w-8 h-8 rounded-full ${isDark ? "bg-slate-700" : "bg-slate-300"} items-center justify-center`}
                         onPress={() =>
                           handleFoodDrinkQuantityChange(foodDrink, -1)
                         }
                         disabled={quantity === 0}
                       >
-                        <Text className="text-white font-bold text-lg">-</Text>
+                        <Text className={textColor + " font-bold text-lg"}>
+                          -
+                        </Text>
                       </TouchableOpacity>
-                      <Text className="text-white font-semibold text-base w-8 text-center">
+                      <Text
+                        className={`${textColor} font-semibold text-base w-8 text-center`}
+                      >
                         {quantity}
                       </Text>
                       <TouchableOpacity
@@ -622,7 +631,7 @@ export default function ShowtimeSelectionScreen() {
                 );
               })}
               {foodDrinks.length === 0 && (
-                <Text className="text-slate-400 text-center py-4">
+                <Text className={`${textMuted} text-center py-4`}>
                   Không có bắp nước nào
                 </Text>
               )}
@@ -632,14 +641,16 @@ export default function ShowtimeSelectionScreen() {
       </ScrollView>
 
       {/* Footer */}
-      <View className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 pb-5">
+      <View
+        className={`absolute bottom-0 left-0 right-0 ${cardBgSecondary} border-t ${borderColor} pb-5`}
+      >
         <View className="px-4 pt-4">
           <View className="mb-3">
-            <Text className="text-slate-400 text-sm mb-1">
+            <Text className={`${textMuted} text-sm mb-1`}>
               Ghế: {selectedSeatNumbers || "Chưa chọn"} ({selectedSeats.length})
             </Text>
             {selectedFoodDrinks.length > 0 && (
-              <Text className="text-slate-400 text-sm mb-1">
+              <Text className={`${textMuted} text-sm mb-1`}>
                 Bắp Nước: x
                 {selectedFoodDrinks.reduce((sum, fd) => sum + fd.quantity, 0)}
               </Text>
@@ -648,7 +659,7 @@ export default function ShowtimeSelectionScreen() {
           <TouchableOpacity
             className={`py-4 rounded-xl items-center ${
               selectedSeats.length === 0
-                ? "bg-slate-700 opacity-50"
+                ? `${isDark ? "bg-slate-700" : "bg-slate-300"} opacity-50`
                 : "bg-red-600"
             }`}
             onPress={handleProceedToCheckout}

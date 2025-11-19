@@ -1,5 +1,5 @@
 // app/screens/Showtimes.tsx
-import { generateNext7Days } from "@/utils/dayUtils";
+import { generateDateOptions } from "@/utils/dayUtils";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
@@ -99,7 +99,7 @@ const MOCK_MOVIES: Movie[] = [
   },
 ];
 
-const DAYS = generateNext7Days();
+const DAYS = generateDateOptions();
 
 const TIME_FILTERS = [
   { label: "00:00 - 03:00", start: 0, end: 3 },
@@ -298,7 +298,7 @@ export default function Showtimes() {
             const active = i === dayIdx;
             return (
               <Pressable
-                key={d.key}
+                key={d.fullDate}
                 onPress={() => setDayIdx(i)}
                 className={`mr-2 rounded-full border px-3 py-2 items-center justify-center
           ${active ? "bg-pink-100 border-pink-300" : "bg-white border-gray-200"}`}
@@ -308,13 +308,13 @@ export default function Showtimes() {
                 <Text
                   className={`text-[12px] font-extrabold leading-4 ${active ? "text-pink-600" : "text-gray-800"}`}
                 >
-                  {d.key}
+                  {d.dayOfMonth}
                 </Text>
                 {/* Dòng 2: Thứ / H.nay */}
                 <Text
                   className={`text-[11px] font-semibold leading-4 ${active ? "text-pink-600" : "text-gray-600"}`}
                 >
-                  {d.label}
+                  {d.dayOfWeek}
                 </Text>
               </Pressable>
             );

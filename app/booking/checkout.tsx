@@ -16,6 +16,7 @@ import { bookingService } from "@/services/booking";
 import { paymentService } from "@/services/payment";
 import { fooddrinkService, FoodDrink } from "@/services/fooddrink";
 import { useToast } from "@/contexts/toastContext";
+import { useTheme } from "@/contexts/themeContext";
 
 type PaymentMethod = "MOMO" | "VNPAY" | "ZALOPAY";
 
@@ -24,6 +25,7 @@ const TRANSACTION_TIMEOUT_MINUTES = 10;
 export default function CheckoutScreen() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { isDark } = useTheme();
   const { showtimeId, movieId, seats, seatIds, foodDrinks, totalPrice } =
     useLocalSearchParams<{
       showtimeId: string;
@@ -215,12 +217,22 @@ export default function CheckoutScreen() {
     );
   }, [totalAmount, selectedFoodDrinks, foodDrinkQuantities]);
 
+  // Theme-aware colors
+  const bgColor = isDark ? "bg-slate-950" : "bg-white";
+  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
+  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
+  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
+  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
+  const iconColor = isDark ? "#fff" : "#0f172a";
+
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-950">
+      <SafeAreaView className={`flex-1 ${bgColor}`}>
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#e11d48" />
-          <Text className="text-slate-400 mt-4 text-base">Đang tải...</Text>
+          <Text className={`${textMuted} mt-4 text-base`}>Đang tải...</Text>
         </View>
       </SafeAreaView>
     );
@@ -229,13 +241,15 @@ export default function CheckoutScreen() {
   const timeDisplay = formatTime(timeRemaining.minutes, timeRemaining.seconds);
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950" edges={["top"]}>
+    <SafeAreaView className={`flex-1 ${bgColor}`} edges={["top"]}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-slate-800">
+      <View
+        className={`flex-row items-center justify-between px-4 py-4 border-b ${borderColor}`}
+      >
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color={iconColor} />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold text-white">Thanh toán</Text>
+        <Text className={`text-lg font-semibold ${textColor}`}>Thanh toán</Text>
         <View className="w-6" />
       </View>
 
@@ -246,35 +260,35 @@ export default function CheckoutScreen() {
       >
         {/* Countdown Timer */}
         {bookingId && (
-          <View className="px-4 py-4 border-b border-slate-800">
-            <Text className="text-slate-400 text-sm text-center mb-3">
+          <View className={`px-4 py-4 border-b ${borderColor}`}>
+            <Text className={`${textMuted} text-sm text-center mb-3`}>
               Giao dịch sẽ hết hạn sau
             </Text>
             <View className="flex-row justify-center gap-3">
-              <View className="bg-slate-800 rounded-xl px-6 py-4 items-center">
-                <Text className="text-white text-3xl font-bold">
+              <View className={`${cardBg} rounded-xl px-6 py-4 items-center`}>
+                <Text className={`${textColor} text-3xl font-bold`}>
                   {timeDisplay.minutes}
                 </Text>
-                <Text className="text-slate-400 text-xs mt-1">Phút</Text>
+                <Text className={`${textMuted} text-xs mt-1`}>Phút</Text>
               </View>
-              <View className="bg-slate-800 rounded-xl px-6 py-4 items-center">
-                <Text className="text-white text-3xl font-bold">
+              <View className={`${cardBg} rounded-xl px-6 py-4 items-center`}>
+                <Text className={`${textColor} text-3xl font-bold`}>
                   {timeDisplay.seconds}
                 </Text>
-                <Text className="text-slate-400 text-xs mt-1">Giây</Text>
+                <Text className={`${textMuted} text-xs mt-1`}>Giây</Text>
               </View>
             </View>
           </View>
         )}
 
         {/* Movie and Order Details */}
-        <View className="mx-4 mt-4 mb-4 bg-slate-800 rounded-xl p-4">
+        <View className={`mx-4 mt-4 mb-4 ${cardBg} rounded-xl p-4`}>
           <View className="flex-row">
             <View className="flex-1 mr-4">
-              <Text className="text-white font-bold text-lg mb-2">
+              <Text className={`${textColor} font-bold text-lg mb-2`}>
                 {movie?.title}
               </Text>
-              <Text className="text-slate-400 text-sm mb-1">
+              <Text className={`${textMuted} text-sm mb-1`}>
                 {cinema?.name},{" "}
                 {showtime &&
                   new Date(showtime.startTime).toLocaleDateString("vi-VN", {
@@ -299,18 +313,18 @@ export default function CheckoutScreen() {
             )}
           </View>
 
-          <View className="mt-4 pt-4 border-t border-slate-700">
+          <View className={`mt-4 pt-4 border-t ${borderColorLight}`}>
             <View className="flex-row justify-between mb-3">
-              <Text className="text-slate-400 text-sm">Ghế đã chọn</Text>
-              <Text className="text-white font-semibold">
+              <Text className={`${textMuted} text-sm`}>Ghế đã chọn</Text>
+              <Text className={`${textColor} font-semibold`}>
                 {selectedSeats.join(", ")}
               </Text>
             </View>
             <View className="flex-row justify-between mb-3">
-              <Text className="text-slate-400 text-sm">
+              <Text className={`${textMuted} text-sm`}>
                 Vé xem phim ({selectedSeats.length})
               </Text>
-              <Text className="text-white font-semibold">
+              <Text className={`${textColor} font-semibold`}>
                 {new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
@@ -322,10 +336,10 @@ export default function CheckoutScreen() {
               if (quantity === 0) return null;
               return (
                 <View key={fd.id} className="flex-row justify-between mb-3">
-                  <Text className="text-slate-400 text-sm">
+                  <Text className={`${textMuted} text-sm`}>
                     {fd.name} ({quantity})
                   </Text>
-                  <Text className="text-white font-semibold">
+                  <Text className={`${textColor} font-semibold`}>
                     {new Intl.NumberFormat("vi-VN", {
                       style: "currency",
                       currency: "VND",
@@ -334,9 +348,13 @@ export default function CheckoutScreen() {
                 </View>
               );
             })}
-            <View className="flex-row justify-between mt-4 pt-4 border-t border-slate-700">
-              <Text className="text-white font-bold text-lg">Tổng cộng</Text>
-              <Text className="text-white font-bold text-xl">
+            <View
+              className={`flex-row justify-between mt-4 pt-4 border-t ${borderColorLight}`}
+            >
+              <Text className={`${textColor} font-bold text-lg`}>
+                Tổng cộng
+              </Text>
+              <Text className={`${textColor} font-bold text-xl`}>
                 {new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
@@ -348,7 +366,7 @@ export default function CheckoutScreen() {
 
         {/* Payment Method Selection */}
         <View className="mx-4 mb-4">
-          <Text className="text-white font-bold text-lg mb-4">
+          <Text className={`${textColor} font-bold text-lg mb-4`}>
             Chọn phương thức thanh toán
           </Text>
 
@@ -356,8 +374,8 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
               selectedPaymentMethod === "MOMO"
-                ? "bg-slate-800 border-red-600"
-                : "bg-slate-800 border-slate-700"
+                ? `${cardBg} border-red-600`
+                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
             }`}
             onPress={() => setSelectedPaymentMethod("MOMO")}
           >
@@ -365,13 +383,15 @@ export default function CheckoutScreen() {
               <View className="w-10 h-10 bg-green-600 rounded-lg items-center justify-center">
                 <Text className="text-white font-bold text-xs">MOMO</Text>
               </View>
-              <Text className="text-white font-semibold">Ví MoMo</Text>
+              <Text className={`${textColor} font-semibold`}>Ví MoMo</Text>
             </View>
             <View
               className={`w-5 h-5 rounded-full border-2 ${
                 selectedPaymentMethod === "MOMO"
                   ? "border-red-600 bg-red-600"
-                  : "border-slate-600"
+                  : isDark
+                    ? "border-slate-600"
+                    : "border-slate-400"
               }`}
             >
               {selectedPaymentMethod === "MOMO" && (
@@ -384,16 +404,18 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
               selectedPaymentMethod === "VNPAY"
-                ? "bg-slate-800 border-red-600"
-                : "bg-slate-800 border-slate-700"
+                ? `${cardBg} border-red-600`
+                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
             }`}
             onPress={() => setSelectedPaymentMethod("VNPAY")}
           >
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 bg-slate-600 rounded-lg items-center justify-center">
+              <View
+                className={`w-10 h-10 ${isDark ? "bg-slate-600" : "bg-slate-400"} rounded-lg items-center justify-center`}
+              >
                 <Ionicons name="card" size={20} color="#fff" />
               </View>
-              <Text className="text-white font-semibold">
+              <Text className={`${textColor} font-semibold`}>
                 Thẻ Tín dụng / Ghi nợ
               </Text>
             </View>
@@ -401,7 +423,9 @@ export default function CheckoutScreen() {
               className={`w-5 h-5 rounded-full border-2 ${
                 selectedPaymentMethod === "VNPAY"
                   ? "border-red-600 bg-red-600"
-                  : "border-slate-600"
+                  : isDark
+                    ? "border-slate-600"
+                    : "border-slate-400"
               }`}
             >
               {selectedPaymentMethod === "VNPAY" && (
@@ -414,8 +438,8 @@ export default function CheckoutScreen() {
           <TouchableOpacity
             className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
               selectedPaymentMethod === "ZALOPAY"
-                ? "bg-slate-800 border-red-600"
-                : "bg-slate-800 border-slate-700"
+                ? `${cardBg} border-red-600`
+                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
             }`}
             onPress={() => setSelectedPaymentMethod("ZALOPAY")}
           >
@@ -423,13 +447,15 @@ export default function CheckoutScreen() {
               <View className="w-10 h-10 bg-teal-500 rounded-lg items-center justify-center">
                 <Text className="text-white font-bold text-xs">zab</Text>
               </View>
-              <Text className="text-white font-semibold">Ví ZaloPay</Text>
+              <Text className={`${textColor} font-semibold`}>Ví ZaloPay</Text>
             </View>
             <View
               className={`w-5 h-5 rounded-full border-2 ${
                 selectedPaymentMethod === "ZALOPAY"
                   ? "border-red-600 bg-red-600"
-                  : "border-slate-600"
+                  : isDark
+                    ? "border-slate-600"
+                    : "border-slate-400"
               }`}
             >
               {selectedPaymentMethod === "ZALOPAY" && (
@@ -441,10 +467,14 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* Payment Button */}
-      <View className="px-4 pb-5 pt-3 bg-slate-900 border-t border-slate-800">
+      <View
+        className={`px-4 pb-5 pt-3 ${cardBgSecondary} border-t ${borderColor}`}
+      >
         <TouchableOpacity
           className={`py-4 rounded-xl items-center ${
-            processing ? "bg-slate-700 opacity-50" : "bg-red-600"
+            processing
+              ? `${isDark ? "bg-slate-700" : "bg-slate-300"} opacity-50`
+              : "bg-red-600"
           }`}
           onPress={handlePayment}
           disabled={processing}
