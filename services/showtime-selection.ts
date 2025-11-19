@@ -23,10 +23,7 @@ export const showtimeSelectionService = {
       if (startDate) params.startTime = startDate;
       if (endDate) params.endTime = endDate;
 
-      const response = await axiosConfig.get(
-        `/showtime-service/api/showtimes/public`,
-        { params }
-      );
+      const response = await axiosConfig.get(`/showtimes/public`, { params });
 
       return response.data.data;
     } catch (error: any) {
@@ -39,9 +36,7 @@ export const showtimeSelectionService = {
   // Get showtime details by ID
   getShowtimeById: async (showtimeId: string): Promise<Showtime> => {
     try {
-      const response = await axiosConfig.get(
-        `/showtime-service/api/showtimes/public/${showtimeId}`
-      );
+      const response = await axiosConfig.get(`/showtimes/public/${showtimeId}`);
 
       return response.data.data;
     } catch (error: any) {
@@ -54,9 +49,7 @@ export const showtimeSelectionService = {
   // Get seat layout for a specific room
   getRoomSeatLayout: async (roomId: string): Promise<SeatLayout> => {
     try {
-      const response = await axiosConfig.get(
-        `/cinema-service/api/rooms/public/${roomId}`
-      );
+      const response = await axiosConfig.get(`/rooms/public/${roomId}`);
 
       const room = response.data.data;
 
@@ -84,10 +77,15 @@ export const showtimeSelectionService = {
   getBookedSeats: async (showtimeId: string): Promise<string[]> => {
     try {
       const response = await axiosConfig.get(
-        `/booking-service/api/bookings/showtime/${showtimeId}/booked-seats`
+        `/bookings/public/${showtimeId}/booking-seat`
       );
 
-      return response.data.data || [];
+      const bookingSeats = response.data.data || [];
+      // Extract seat numbers from booking seat objects
+      // Booking seats may have seatNumber or seatId field
+      return bookingSeats
+        .map((seat: any) => seat.seatNumber || seat.seatId || seat.id)
+        .filter(Boolean);
     } catch (error: any) {
       // If endpoint doesn't exist or returns error, return empty array
       console.warn("Could not fetch booked seats:", error.message);
@@ -98,9 +96,7 @@ export const showtimeSelectionService = {
   // Get movie details
   getMovieDetails: async (movieId: string) => {
     try {
-      const response = await axiosConfig.get(
-        `/movie-service/api/movies/public/${movieId}`
-      );
+      const response = await axiosConfig.get(`/movies/public/${movieId}`);
 
       return response.data.data;
     } catch (error: any) {
@@ -113,9 +109,7 @@ export const showtimeSelectionService = {
   // Get cinema details
   getCinemaDetails: async (cinemaId: string) => {
     try {
-      const response = await axiosConfig.get(
-        `/cinema-service/api/cinemas/public/${cinemaId}`
-      );
+      const response = await axiosConfig.get(`/cinemas/public/${cinemaId}`);
 
       return response.data.data;
     } catch (error: any) {

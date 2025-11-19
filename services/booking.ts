@@ -58,11 +58,16 @@ export const bookingService = {
   },
 
   // Create a new booking
-  createBooking: async (showtimeId: string, seatIds: string[]) => {
+  createBooking: async (
+    showtimeId: string,
+    seatIds: string[],
+    foodDrinks?: Array<{ id: string; quantity: number }>
+  ) => {
     try {
       const response = await axiosConfig.post(`/bookings`, {
         showtimeId,
         seatIds,
+        foodDrinks: foodDrinks || [],
       });
 
       // Transform the response data to ensure dates are properly converted
