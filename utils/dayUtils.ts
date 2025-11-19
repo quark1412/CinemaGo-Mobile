@@ -1,24 +1,29 @@
-// utils/dayUtils.ts
+import { DateOption } from "@/types/showtime";
 
-export const generateNext7Days = () => {
+export const generateDateOptions = (): DateOption[] => {
   const today = new Date();
+  const options: DateOption[] = [];
 
-  return Array.from({ length: 7 }, (_, i) => {
+  for (let i = 0; i < 7; i++) {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
 
-    // Định dạng ngày: dd/mm
-    const key = date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
+    const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    const dayOfWeek = i === 0 ? "Hôm nay" : dayNames[date.getDay()];
+    const dayOfMonth = date.getDate().toString();
+    const month = (date.getMonth() + 1).toString();
+    const fullDate = date.toISOString().split("T")[0];
+
+    options.push({
+      date,
+      dayOfWeek,
+      dayOfMonth:
+        i === 0
+          ? `${dayOfMonth}/${month}`
+          : `${dayOfWeek}, ${dayOfMonth}/${month}`,
+      fullDate,
     });
+  }
 
-    // Nếu là hôm nay thì gắn label riêng
-    const label =
-      i === 0
-        ? "Hôm nay"
-        : date.toLocaleDateString("vi-VN", { weekday: "short" });
-
-    return { key, label };
-  });
+  return options;
 };

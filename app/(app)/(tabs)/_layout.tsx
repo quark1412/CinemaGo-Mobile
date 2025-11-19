@@ -8,9 +8,10 @@ export default function RootLayout() {
   const { isDark } = useTheme();
 
   const colors = {
-    background: isDark ? "#0f1016" : "#ffffff",
-    activeColor: "#008585",
-    inactiveColor: isDark ? "#ffffff" : "#6b7280",
+    background: isDark ? "#0f172a" : "#ffffff",
+    activeColor: "#e11d48",
+    inactiveColor: isDark ? "#94a3b8" : "#64748b",
+    border: isDark ? "#334155" : "#e2e8f0",
   };
 
   return (
@@ -19,9 +20,11 @@ export default function RootLayout() {
         headerShown: false,
         tabBarStyle: {
           marginBottom: 20,
-          borderTopWidth: 0,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
           backgroundColor: colors.background,
           elevation: 0,
+          shadowOpacity: 0,
         },
       }}
     >
