@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
-  StyleSheet,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { showtimeSelectionService } from "@/services/showtime-selection";
+import { fooddrinkService, FoodDrink } from "@/services/fooddrink";
 import {
   Showtime,
   SeatLayout,
@@ -23,6 +24,12 @@ import {
 import { useToast } from "@/contexts/toastContext";
 
 const { width } = Dimensions.get("window");
+
+interface SelectedFoodDrink {
+  id: string;
+  quantity: number;
+  foodDrink: FoodDrink;
+}
 
 export default function ShowtimeSelectionScreen() {
   const { id: movieId } = useLocalSearchParams<{ id: string }>();
@@ -42,6 +49,11 @@ export default function ShowtimeSelectionScreen() {
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [loadingSeatMap, setLoadingSeatMap] = useState(false);
+  const [foodDrinks, setFoodDrinks] = useState<FoodDrink[]>([]);
+  const [selectedFoodDrinks, setSelectedFoodDrinks] = useState<
+    SelectedFoodDrink[]
+  >([]);
+  const [loadingFoodDrinks, setLoadingFoodDrinks] = useState(false);
 
   // Generate date options (today + next 6 days)
   const dateOptions = useMemo<DateOption[]>(() => {
@@ -52,14 +64,19 @@ export default function ShowtimeSelectionScreen() {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
 
-      const dayOfWeek = date.toLocaleDateString("en-US", { weekday: "short" });
+      const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+      const dayOfWeek = i === 0 ? "Hôm nay" : dayNames[date.getDay()];
       const dayOfMonth = date.getDate().toString();
+      const month = (date.getMonth() + 1).toString();
       const fullDate = date.toISOString().split("T")[0];
 
       options.push({
         date,
         dayOfWeek,
-        dayOfMonth,
+        dayOfMonth:
+          i === 0
+            ? `${dayOfMonth}/${month}`
+            : `${dayOfWeek}, ${dayOfMonth}/${month}`,
         fullDate,
       });
     }
@@ -81,8 +98,13 @@ export default function ShowtimeSelectionScreen() {
 
   // Calculate total price
   const totalPrice = useMemo(() => {
-    return selectedSeats.reduce((sum, seat) => sum + seat.price, 0);
-  }, [selectedSeats]);
+    const seatsPrice = selectedSeats.reduce((sum, seat) => sum + seat.price, 0);
+    const foodDrinksPrice = selectedFoodDrinks.reduce(
+      (sum, foodDrink) => sum + foodDrink.foodDrink.price * foodDrink.quantity,
+      0
+    );
+    return seatsPrice + foodDrinksPrice;
+  }, [selectedSeats, selectedFoodDrinks]);
 
   // Get selected seat numbers
   const selectedSeatNumbers = useMemo(() => {
@@ -100,6 +122,11 @@ export default function ShowtimeSelectionScreen() {
       setSelectedDate(dateOptions[0]);
     }
   }, [dateOptions]);
+
+  // Load combos
+  useEffect(() => {
+    loadFoodDrinks();
+  }, []);
 
   const loadInitialData = async () => {
     try {
@@ -132,6 +159,22 @@ export default function ShowtimeSelectionScreen() {
       showToast(error.message || "Failed to load data", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFoodDrinks = async () => {
+    try {
+      setLoadingFoodDrinks(true);
+      const response = await fooddrinkService.getFoodDrinks({
+        isAvailable: true,
+        limit: 20,
+      });
+
+      setFoodDrinks(response.data);
+    } catch (error: any) {
+      console.error("Failed to load food drinks:", error);
+    } finally {
+      setLoadingFoodDrinks(false);
     }
   };
 
@@ -207,58 +250,53 @@ export default function ShowtimeSelectionScreen() {
       return;
     }
 
-    // For couple seats, handle both seats together
-    if (isCoupleSeatPair(seat) && seat.coupleWith !== undefined && seatLayout) {
-      const coupleSeat = seatLayout.seats[seat.row][seat.coupleWith];
+    const isSelected = selectedSeats.some(
+      (s) => s.row === seat.row && s.col === seat.col
+    );
 
-      const isBothSelected =
-        selectedSeats.some((s) => s.row === seat.row && s.col === seat.col) &&
-        selectedSeats.some(
-          (s) => s.row === coupleSeat.row && s.col === coupleSeat.col
-        );
-
-      if (isBothSelected) {
-        // Deselect both couple seats
-        setSelectedSeats(
-          selectedSeats.filter(
-            (s) =>
-              !(
-                (s.row === seat.row && s.col === seat.col) ||
-                (s.row === coupleSeat.row && s.col === coupleSeat.col)
-              )
-          )
-        );
-      } else {
-        // Select both couple seats
-        const newSeats = selectedSeats.filter(
-          (s) =>
-            !(
-              (s.row === seat.row && s.col === seat.col) ||
-              (s.row === coupleSeat.row && s.col === coupleSeat.col)
-            )
-        );
-        setSelectedSeats([...newSeats, seat, coupleSeat]);
-      }
-    } else {
-      // Regular single seat
-      const isSelected = selectedSeats.some(
-        (s) => s.row === seat.row && s.col === seat.col
+    if (isSelected) {
+      setSelectedSeats(
+        selectedSeats.filter((s) => s.row !== seat.row || s.col !== seat.col)
       );
+    } else {
+      setSelectedSeats([...selectedSeats, seat]);
+    }
+  };
 
-      if (isSelected) {
-        // Deselect seat
-        setSelectedSeats(
-          selectedSeats.filter((s) => s.row !== seat.row || s.col !== seat.col)
+  const handleFoodDrinkQuantityChange = (
+    foodDrink: FoodDrink,
+    change: number
+  ) => {
+    setSelectedFoodDrinks((prev) => {
+      const existing = prev.find((fd) => fd.id === foodDrink.id);
+      if (existing) {
+        const newQuantity = existing.quantity + change;
+        if (newQuantity <= 0) {
+          return prev.filter((fd) => fd.id !== foodDrink.id);
+        }
+        return prev.map((fd) =>
+          fd.id === foodDrink.id ? { ...fd, quantity: newQuantity } : fd
         );
       } else {
-        // Select seat
-        setSelectedSeats([...selectedSeats, seat]);
+        if (change > 0) {
+          return [
+            ...prev,
+            { id: foodDrink.id, quantity: 1, foodDrink: foodDrink },
+          ];
+        }
+        return prev;
       }
-    }
+    });
+  };
+
+  const getFoodDrinkQuantity = (foodDrinkId: string) => {
+    const selected = selectedFoodDrinks.find((fd) => fd.id === foodDrinkId);
+    return selected?.quantity || 0;
   };
 
   const handleProceedToCheckout = () => {
     if (selectedSeats.length === 0 || !selectedShowtime) {
+      showToast("Vui lòng chọn ghế ngồi", "error");
       return;
     }
 
@@ -269,249 +307,191 @@ export default function ShowtimeSelectionScreen() {
         showtimeId: selectedShowtime.id,
         movieId: movieId,
         seats: JSON.stringify(selectedSeats.map((s) => s.seatNumber)),
+        seatIds: JSON.stringify(selectedSeats.map((s) => s.seatNumber)),
+        combos: JSON.stringify(
+          selectedFoodDrinks.map((fd) => ({
+            id: fd.id,
+            quantity: fd.quantity,
+          }))
+        ),
         totalPrice: totalPrice.toString(),
       },
     });
   };
 
-  const getSeatIcon = (type: SeatType) => {
-    switch (type) {
-      case SeatType.NORMAL:
-        return "🪑";
-      case SeatType.VIP:
-        return "👑";
-      case SeatType.COUPLE:
-        return "🛋️";
-      case SeatType.BLOCKED:
-        return "🚫";
-      default:
-        return "";
-    }
-  };
-
-  const isCoupleSeatPair = (seat: Seat): boolean => {
-    return seat.type === SeatType.COUPLE && seat.isCoupleSeat === true;
-  };
-
-  const isLeftCoupleSet = (seat: Seat, seatLayout: SeatLayout): boolean => {
-    if (!isCoupleSeatPair(seat)) return false;
-    if (seat.coupleWith === undefined) return false;
-    return seat.col < seat.coupleWith;
-  };
-
   const getSeatStyle = (seat: Seat) => {
     if (seat.type === SeatType.EMPTY) {
-      return styles.seatEmpty;
+      return "w-8 h-8 mx-1";
     }
 
     const isSelected = selectedSeats.some(
       (s) => s.row === seat.row && s.col === seat.col
     );
 
-    // Handle couple seats - render only the left seat
-    if (isCoupleSeatPair(seat)) {
-      const isLeft = seatLayout ? isLeftCoupleSet(seat, seatLayout) : true;
-
-      if (!isLeft) {
-        // Right seat of couple - hide it
-        return styles.seatHidden;
-      }
-
-      // Left seat of couple - wider style
-      if (isSelected) {
-        return [styles.seatCouple, styles.coupleSeatWide, styles.seatSelected];
-      }
-      if (seat.status === SeatStatus.BOOKED) {
-        return [styles.seatCouple, styles.coupleSeatWide, styles.seatBooked];
-      }
-      return [styles.seatCouple, styles.coupleSeatWide];
-    }
-
-    // Regular single seats
     if (isSelected) {
-      return [styles.seat, styles.seatSelected];
+      return "w-8 h-8 mx-1 rounded bg-red-600 border border-red-700";
     }
 
     if (seat.status === SeatStatus.BOOKED) {
-      return [styles.seat, styles.seatBooked];
+      return "w-8 h-8 mx-1 rounded bg-gray-600 border border-gray-700 opacity-50";
     }
 
-    // Available seats with type-based colors
-    switch (seat.type) {
-      case SeatType.VIP:
-        return [styles.seat, styles.seatVip];
-      case SeatType.BLOCKED:
-        return [styles.seat, styles.seatBlocked];
-      default:
-        return [styles.seat, styles.seatAvailable];
+    if (seat.type === SeatType.VIP) {
+      return "w-8 h-8 mx-1 rounded border-2 border-yellow-500 bg-transparent";
     }
+
+    return "w-8 h-8 mx-1 rounded bg-gray-700 border border-gray-600";
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+      <SafeAreaView className="flex-1 bg-slate-950">
+        <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#e11d48" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text className="text-slate-400 mt-4 text-base">Đang tải...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-slate-950" edges={["top"]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-slate-800">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Showtime & Seats</Text>
-        <View style={{ width: 24 }} />
+        <Text className="text-lg font-semibold text-white">Chọn vé</Text>
+        <View className="w-6" />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        className="flex-1"
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* Movie Information */}
-        {movieDetails && (
-          <View style={styles.movieInfo}>
-            <Text style={styles.movieTitle}>{movieDetails.title}</Text>
-            {cinemaDetails && (
-              <Text style={styles.cinemaName}>
-                {cinemaDetails.name} • {cinemaDetails.address}
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* Date Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Date</Text>
+        {/* Date Selection Section */}
+        <View className="py-5 border-b border-slate-800">
+          <Text className="text-lg font-semibold text-white px-4 mb-4">
+            Chọn Suất Chiếu
+          </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.dateScroller}
+            className="px-4"
           >
             {dateOptions.map((date, index) => (
               <TouchableOpacity
                 key={index}
-                style={[
-                  styles.dateItem,
-                  selectedDate?.fullDate === date.fullDate &&
-                    styles.dateItemSelected,
-                ]}
+                className={`px-4 py-3 mr-3 rounded-xl border-2 ${
+                  selectedDate?.fullDate === date.fullDate
+                    ? "bg-red-600 border-red-600"
+                    : "bg-slate-800 border-slate-700"
+                }`}
                 onPress={() => handleDateSelect(date)}
               >
                 <Text
-                  style={[
-                    styles.dayOfWeek,
-                    selectedDate?.fullDate === date.fullDate &&
-                      styles.dateTextSelected,
-                  ]}
+                  className={`text-sm font-semibold mb-1 ${
+                    selectedDate?.fullDate === date.fullDate
+                      ? "text-white"
+                      : "text-slate-400"
+                  }`}
                 >
                   {date.dayOfWeek}
                 </Text>
                 <Text
-                  style={[
-                    styles.dayOfMonth,
-                    selectedDate?.fullDate === date.fullDate &&
-                      styles.dateTextSelected,
-                  ]}
+                  className={`text-lg font-bold ${
+                    selectedDate?.fullDate === date.fullDate
+                      ? "text-white"
+                      : "text-white"
+                  }`}
                 >
-                  {date.dayOfMonth}
+                  {date.dayOfMonth.includes("/")
+                    ? date.dayOfMonth.split(", ")[1] || date.dayOfMonth
+                    : date.dayOfMonth}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
+
+          {/* Time Selection */}
+          {selectedDate && (
+            <View className="px-4 mt-4">
+              {filteredShowtimes.length === 0 ? (
+                <Text className="text-slate-400 text-center py-4">
+                  Không có suất chiếu cho ngày này
+                </Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="flex-row flex-wrap"
+                >
+                  {filteredShowtimes.map((showtime) => (
+                    <TouchableOpacity
+                      key={showtime.id}
+                      className={`px-5 py-3 mr-3 mb-3 rounded-xl border-2 ${
+                        selectedShowtime?.id === showtime.id
+                          ? "bg-red-600 border-red-600"
+                          : "bg-slate-800 border-slate-700"
+                      }`}
+                      onPress={() => handleShowtimeSelect(showtime)}
+                    >
+                      <Text
+                        className={`text-base font-bold ${
+                          selectedShowtime?.id === showtime.id
+                            ? "text-white"
+                            : "text-white"
+                        }`}
+                      >
+                        {new Date(showtime.startTime).toLocaleTimeString(
+                          "vi-VN",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                          }
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
 
-        {/* Showtime Selector */}
-        {selectedDate && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Showtime</Text>
-            {filteredShowtimes.length === 0 ? (
-              <Text style={styles.noShowtimes}>
-                No showtimes available for this date
-              </Text>
-            ) : (
-              <View style={styles.showtimeGrid}>
-                {filteredShowtimes.map((showtime) => (
-                  <TouchableOpacity
-                    key={showtime.id}
-                    style={[
-                      styles.showtimeItem,
-                      selectedShowtime?.id === showtime.id &&
-                        styles.showtimeItemSelected,
-                    ]}
-                    onPress={() => handleShowtimeSelect(showtime)}
-                  >
-                    <Text
-                      style={[
-                        styles.showtimeText,
-                        selectedShowtime?.id === showtime.id &&
-                          styles.showtimeTextSelected,
-                      ]}
-                    >
-                      {new Date(showtime.startTime).toLocaleTimeString(
-                        "en-US",
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: false,
-                        }
-                      )}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.showtimeFormat,
-                        selectedShowtime?.id === showtime.id &&
-                          styles.showtimeTextSelected,
-                      ]}
-                    >
-                      {showtime.format} • {showtime.language}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Seat Map */}
+        {/* Seat Selection Section */}
         {selectedShowtime && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Seats</Text>
+          <View className="py-5 border-b border-slate-800">
+            <Text className="text-lg font-semibold text-white px-4 mb-4">
+              Chọn Ghế Ngồi
+            </Text>
 
             {loadingSeatMap ? (
-              <View style={styles.loadingContainer}>
+              <View className="py-10 items-center">
                 <ActivityIndicator size="large" color="#e11d48" />
               </View>
             ) : seatLayout && seatLayout.seats.length > 0 ? (
               <>
                 {/* Screen Indicator */}
-                <View style={styles.screenContainer}>
-                  <View style={styles.screen} />
-                  <Text style={styles.screenText}>SCREEN</Text>
+                <View className="items-center mb-6 px-4">
+                  <View className="w-full h-1 bg-red-600 rounded mb-2" />
+                  <Text className="text-xs font-semibold text-slate-400 tracking-wider">
+                    MÀN HÌNH
+                  </Text>
                 </View>
 
                 {/* Seat Grid */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.seatMapContainer}>
+                  <View className="px-4 items-center">
                     {seatLayout.seats.map((row, rowIndex) => (
-                      <View key={rowIndex} style={styles.seatRow}>
+                      <View
+                        key={rowIndex}
+                        className="flex-row mb-2 justify-center"
+                      >
                         {row.map((seat, colIndex) => {
                           const seatStyle = getSeatStyle(seat);
-
-                          // Skip rendering right seat of couple pair
-                          if (
-                            Array.isArray(seatStyle) &&
-                            seatStyle.some((s) => s === styles.seatHidden)
-                          ) {
-                            return null;
-                          }
-
-                          const isCouple = isCoupleSeatPair(seat);
                           const isSelected = selectedSeats.some(
                             (s) => s.row === seat.row && s.col === seat.col
                           );
@@ -519,7 +499,7 @@ export default function ShowtimeSelectionScreen() {
                           return (
                             <TouchableOpacity
                               key={`${rowIndex}-${colIndex}`}
-                              style={seatStyle}
+                              className={seatStyle}
                               onPress={() => handleSeatToggle(seat)}
                               disabled={
                                 seat.status === SeatStatus.BOOKED ||
@@ -528,19 +508,18 @@ export default function ShowtimeSelectionScreen() {
                               }
                             >
                               {seat.type !== SeatType.EMPTY && (
-                                <View style={styles.seatContent}>
-                                  {isCouple ? (
-                                    <>
-                                      <Text style={styles.seatIcon}>🛋️</Text>
-                                      <Text style={styles.seatNumber}>
-                                        {seat.seatNumber}
-                                      </Text>
-                                    </>
-                                  ) : (
-                                    <Text style={styles.seatNumber}>
-                                      {seat.seatNumber}
+                                <View className="flex-1 justify-center items-center">
+                                  {seat.type === SeatType.VIP && (
+                                    <Text className="text-[8px] text-yellow-500 font-bold">
+                                      VIP
                                     </Text>
                                   )}
+                                  {!isSelected &&
+                                    seat.status === SeatStatus.AVAILABLE && (
+                                      <Text className="text-[8px] text-white font-semibold">
+                                        {seat.seatNumber}
+                                      </Text>
+                                    )}
                                 </View>
                               )}
                             </TouchableOpacity>
@@ -552,360 +531,133 @@ export default function ShowtimeSelectionScreen() {
                 </ScrollView>
 
                 {/* Legend */}
-                <View style={styles.legend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendBox, styles.seatAvailable]} />
-                    <Text style={styles.legendText}>Available</Text>
+                <View className="flex-row flex-wrap justify-center gap-4 mt-6 px-4">
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 rounded bg-slate-700 border border-slate-600" />
+                    <Text className="text-xs text-slate-400">Trống</Text>
                   </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendBox, styles.seatSelected]} />
-                    <Text style={styles.legendText}>Selected</Text>
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 rounded bg-red-600 border border-red-700" />
+                    <Text className="text-xs text-slate-400">Đang chọn</Text>
                   </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendBox, styles.seatBooked]} />
-                    <Text style={styles.legendText}>Booked</Text>
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 rounded bg-gray-600 border border-gray-700 opacity-50" />
+                    <Text className="text-xs text-slate-400">Đã bán</Text>
                   </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendBox, styles.seatVip]} />
-                    <Text style={styles.legendText}>VIP</Text>
-                  </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendBox, styles.seatCouple]} />
-                    <Text style={styles.legendText}>Couple</Text>
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 rounded border-2 border-yellow-500 bg-transparent" />
+                    <Text className="text-xs text-slate-400">VIP</Text>
                   </View>
                 </View>
               </>
             ) : (
-              <Text style={styles.noSeats}>No seat layout available</Text>
+              <Text className="text-slate-400 text-center py-4">
+                Không có sơ đồ ghế
+              </Text>
             )}
           </View>
         )}
 
-        {/* Bottom spacing */}
-        <View style={{ height: 120 }} />
+        {/* Combo Selection Section */}
+        <View className="py-5 border-b border-slate-800">
+          <Text className="text-lg font-semibold text-white px-4 mb-4">
+            Chọn Bắp Nước
+          </Text>
+
+          {loadingFoodDrinks ? (
+            <View className="py-10 items-center">
+              <ActivityIndicator size="large" color="#e11d48" />
+            </View>
+          ) : (
+            <View className="px-4">
+              {foodDrinks.map((foodDrink) => {
+                const quantity = getFoodDrinkQuantity(foodDrink.id);
+                return (
+                  <View
+                    key={foodDrink.id}
+                    className="flex-row items-center mb-4 p-4 bg-slate-800 rounded-xl"
+                  >
+                    <Image
+                      source={{ uri: foodDrink.image }}
+                      className="w-20 h-20 rounded-lg mr-4"
+                      resizeMode="cover"
+                    />
+                    <View className="flex-1">
+                      <Text className="text-white font-semibold text-base mb-1">
+                        {foodDrink.name}
+                      </Text>
+                      <Text className="text-slate-400 text-sm mb-2">
+                        {foodDrink.description}
+                      </Text>
+                      <Text className="text-red-500 font-bold text-base">
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(foodDrink.price)}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-3">
+                      <TouchableOpacity
+                        className="w-8 h-8 rounded-full bg-slate-700 items-center justify-center"
+                        onPress={() =>
+                          handleFoodDrinkQuantityChange(foodDrink, -1)
+                        }
+                        disabled={quantity === 0}
+                      >
+                        <Text className="text-white font-bold text-lg">-</Text>
+                      </TouchableOpacity>
+                      <Text className="text-white font-semibold text-base w-8 text-center">
+                        {quantity}
+                      </Text>
+                      <TouchableOpacity
+                        className="w-8 h-8 rounded-full bg-red-600 items-center justify-center"
+                        onPress={() =>
+                          handleFoodDrinkQuantityChange(foodDrink, 1)
+                        }
+                      >
+                        <Text className="text-white font-bold text-lg">+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+              {foodDrinks.length === 0 && (
+                <Text className="text-slate-400 text-center py-4">
+                  Không có bắp nước nào
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
-      {/* Checkout Footer */}
-      <View style={styles.footer}>
-        <View style={styles.footerContent}>
-          <View style={styles.selectionSummary}>
-            <Text style={styles.selectedSeatsLabel}>
-              {selectedSeats.length === 0
-                ? "Select your seats"
-                : `Seats: ${selectedSeatNumbers}`}
+      {/* Footer */}
+      <View className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 pb-5">
+        <View className="px-4 pt-4">
+          <View className="mb-3">
+            <Text className="text-slate-400 text-sm mb-1">
+              Ghế: {selectedSeatNumbers || "Chưa chọn"} ({selectedSeats.length})
             </Text>
-            <Text style={styles.totalPrice}>
-              {new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: "VND",
-              }).format(totalPrice)}
-            </Text>
+            {selectedFoodDrinks.length > 0 && (
+              <Text className="text-slate-400 text-sm mb-1">
+                Bắp Nước: x
+                {selectedFoodDrinks.reduce((sum, fd) => sum + fd.quantity, 0)}
+              </Text>
+            )}
           </View>
           <TouchableOpacity
-            style={[
-              styles.checkoutButton,
-              selectedSeats.length === 0 && styles.checkoutButtonDisabled,
-            ]}
+            className={`py-4 rounded-xl items-center ${
+              selectedSeats.length === 0
+                ? "bg-slate-700 opacity-50"
+                : "bg-red-600"
+            }`}
             onPress={handleProceedToCheckout}
             disabled={selectedSeats.length === 0}
           >
-            <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+            <Text className="text-white font-bold text-base">Thanh toán</Text>
           </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "#94a3b8",
-    marginTop: 12,
-    fontSize: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  movieInfo: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
-  },
-  movieTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  cinemaName: {
-    fontSize: 14,
-    color: "#94a3b8",
-  },
-  section: {
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  dateScroller: {
-    paddingHorizontal: 16,
-  },
-  dateItem: {
-    width: 70,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginRight: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#334155",
-    alignItems: "center",
-    backgroundColor: "#1e293b",
-  },
-  dateItemSelected: {
-    backgroundColor: "#e11d48",
-    borderColor: "#e11d48",
-  },
-  dayOfWeek: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#94a3b8",
-    marginBottom: 4,
-  },
-  dayOfMonth: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  dateTextSelected: {
-    color: "#fff",
-  },
-  showtimeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  showtimeItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#334155",
-    backgroundColor: "#1e293b",
-    minWidth: 100,
-    alignItems: "center",
-  },
-  showtimeItemSelected: {
-    backgroundColor: "#e11d48",
-    borderColor: "#e11d48",
-  },
-  showtimeText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 4,
-  },
-  showtimeFormat: {
-    fontSize: 12,
-    color: "#94a3b8",
-  },
-  showtimeTextSelected: {
-    color: "#fff",
-  },
-  noShowtimes: {
-    textAlign: "center",
-    color: "#94a3b8",
-    fontSize: 14,
-    paddingVertical: 20,
-  },
-  screenContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-    paddingHorizontal: 16,
-  },
-  screen: {
-    width: width - 64,
-    height: 4,
-    backgroundColor: "#e11d48",
-    borderRadius: 2,
-    marginBottom: 8,
-  },
-  screenText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#94a3b8",
-    letterSpacing: 2,
-  },
-  seatMapContainer: {
-    paddingHorizontal: 16,
-    alignItems: "center",
-  },
-  seatRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-    justifyContent: "center",
-  },
-  seat: {
-    width: 32,
-    height: 32,
-    marginHorizontal: 4,
-    borderRadius: 6,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  seatEmpty: {
-    width: 32,
-    height: 32,
-    marginHorizontal: 4,
-  },
-  seatHidden: {
-    width: 0,
-    height: 0,
-    margin: 0,
-    opacity: 0,
-  },
-  coupleSeatWide: {
-    width: 68, // 32 * 2 + 4 (margin between)
-  },
-  seatAvailable: {
-    backgroundColor: "#334155",
-    borderColor: "#475569",
-  },
-  seatSelected: {
-    backgroundColor: "#e11d48",
-    borderColor: "#be123c",
-  },
-  seatBooked: {
-    backgroundColor: "#64748b",
-    borderColor: "#475569",
-    opacity: 0.5,
-  },
-  seatVip: {
-    backgroundColor: "#f59e0b",
-    borderColor: "#d97706",
-  },
-  seatCouple: {
-    backgroundColor: "#ec4899",
-    borderColor: "#db2777",
-  },
-  seatBlocked: {
-    backgroundColor: "#ef4444",
-    borderColor: "#dc2626",
-    opacity: 0.5,
-  },
-  seatContent: {
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  seatIcon: {
-    fontSize: 16,
-    marginBottom: 2,
-  },
-  seatNumber: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  legend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 16,
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  legendBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  legendText: {
-    fontSize: 12,
-    color: "#94a3b8",
-  },
-  noSeats: {
-    textAlign: "center",
-    color: "#94a3b8",
-    fontSize: 14,
-    paddingVertical: 20,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#1e293b",
-    borderTopWidth: 1,
-    borderTopColor: "#334155",
-    paddingBottom: 20,
-  },
-  footerContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  selectionSummary: {
-    marginBottom: 12,
-  },
-  selectedSeatsLabel: {
-    fontSize: 14,
-    color: "#94a3b8",
-    marginBottom: 4,
-  },
-  totalPrice: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  checkoutButton: {
-    backgroundColor: "#e11d48",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  checkoutButtonDisabled: {
-    backgroundColor: "#64748b",
-    opacity: 0.5,
-  },
-  checkoutButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
-  },
-});
