@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MovieItem } from "./MovieItem";
+import { MovieItem } from "../../../components/movie-item";
 
 const STATUS_OPTIONS = [
   { id: "all", label: "Tất cả" },
@@ -28,10 +28,9 @@ export default function SearchScreen() {
   const { isDark } = useTheme();
 
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [genreOptions, setGenreOptions] = useState<Genre[]>([]); // Data Genre từ API
+  const [genreOptions, setGenreOptions] = useState<Genre[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- STATE FILTER ---
   const [keyword, setKeyword] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -42,7 +41,6 @@ export default function SearchScreen() {
   const [appliedRating, setAppliedRating] = useState(0);
   const [appliedGenres, setAppliedGenres] = useState<string[]>([]);
 
-  //genre
   useEffect(() => {
     let isCancelled = false;
 
@@ -175,10 +173,9 @@ export default function SearchScreen() {
     setAppliedStatus(selectedStatus);
     setAppliedRating(minRating);
     setAppliedGenres(selectedGenres);
-    setShowFilter(false); // Đóng panel
+    setShowFilter(false);
   };
 
-  // Theme-aware colors
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
   const textColor = isDark ? "text-white" : "text-slate-900";
   const iconColor = isDark ? "#fff" : "#0f172a";
@@ -189,7 +186,6 @@ export default function SearchScreen() {
 
       <SafeAreaView edges={["top"]} className={`flex-1  ${bgColor}`}>
         <View className="flex-1">
-          {/* --- HEADER SEARCH --- */}
           <View className={`px-4 z-10  ${bgColor} pb-2 shadow-sm`}>
             <View className="flex-row items-center mt-2 mb-2">
               <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -217,7 +213,6 @@ export default function SearchScreen() {
                 )}
               </View>
 
-              {/* Toggle Filter Button */}
               <TouchableOpacity
                 onPress={toggleFilterPanel}
                 className={`ml-3 p-2 rounded-lg border ${
@@ -234,14 +229,12 @@ export default function SearchScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* --- FILTER PANEL --- */}
             {showFilter && (
               <View className="mt-2">
                 <ScrollView
                   style={{ maxHeight: 450 }}
                   showsVerticalScrollIndicator={false}
                 >
-                  {/* 1. Status Filter */}
                   <Text className={`font-[bold] text-[14px] mb-2 ${textColor}`}>
                     Trạng thái
                   </Text>
@@ -265,7 +258,6 @@ export default function SearchScreen() {
                     ))}
                   </View>
 
-                  {/* 2. Rating Filter */}
                   <View className="flex-row justify-between items-center mb-2">
                     <Text className={`font-[bold] text-[14px] ${textColor}`}>
                       Điểm đánh giá
@@ -299,7 +291,6 @@ export default function SearchScreen() {
                     ))}
                   </ScrollView>
 
-                  {/* 3. Genres Filter */}
                   <Text className={`font-[bold] text-[14px] mb-2 ${textColor}`}>
                     Thể loại
                   </Text>
@@ -333,7 +324,6 @@ export default function SearchScreen() {
                     )}
                   </View>
 
-                  {/* Action Buttons */}
                   <View className="flex-row gap-3 mb-2">
                     <TouchableOpacity
                       onPress={resetFilters}
@@ -342,7 +332,6 @@ export default function SearchScreen() {
                       <Text className="font-medium text-gray-600">Đặt lại</Text>
                     </TouchableOpacity>
 
-                    {/* Nút Áp dụng gọi hàm applyFilters */}
                     <TouchableOpacity
                       onPress={applyFilters}
                       className="flex-1 bg-orange-500 py-3 rounded-xl items-center"
@@ -355,7 +344,6 @@ export default function SearchScreen() {
             )}
           </View>
 
-          {/* --- RESULT LIST --- */}
           <View className={`flex-1 px-4 ${bgColor} pt-4`}>
             {isLoading ? (
               <View className="mt-20 items-center">

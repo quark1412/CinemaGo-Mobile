@@ -1,6 +1,6 @@
 import { useTheme } from "@/contexts/themeContext";
 import type { Genre } from "@/types/movie";
-import { Ionicons } from "@expo/vector-icons"; // Để dùng icon ngôi sao
+import { Ionicons } from "@expo/vector-icons";
 import { memo } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
@@ -66,7 +66,6 @@ function MovieItemCmp({
             </View>
           )}
 
-          {/* Tên phim */}
           <Text
             className={`font-[bold] text-[15px] leading-tight ${textColor}`}
             numberOfLines={1}
@@ -74,7 +73,6 @@ function MovieItemCmp({
             {title}
           </Text>
 
-          {/* Thể loại */}
           {!!genres && (
             <Text
               className="text-gray-400 text-[13px] mt-0.5 font-[medium]"
