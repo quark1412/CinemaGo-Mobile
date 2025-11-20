@@ -3,28 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --primary: #008585;
+  --primary: #e11d48;
+  --primary-dark: #be123c;
   --light-yellow: #fff0e8;
 }
 
-/* Dark theme */
+/* Dark theme - matching showtime-selection slate colors */
 .dark {
-  --background: #0f1016;
+  --background: #0f172a;
   --foreground: #ffffff;
-  --muted-background: #21252a;
-  --card-background: #21252a;
-  --border: #374151;
-  --text-muted: #9ca3af;
+  --muted-background: #1e293b;
+  --card-background: #1e293b;
+  --card-secondary: #334155;
+  --border: #334155;
+  --border-light: #475569;
+  --text-muted: #94a3b8;
+  --text-secondary: #64748b;
+  --selected: #e11d48;
+  --selected-dark: #be123c;
+  --disabled: #64748b;
 }
 
 /* Light theme */
 .light {
   --background: #ffffff;
-  --foreground: #1f2937;
-  --muted-background: #f3f4f6;
-  --card-background: #f9fafb;
-  --border: #e5e7eb;
-  --text-muted: #6b7280;
+  --foreground: #0f172a;
+  --muted-background: #f8fafc;
+  --card-background: #f1f5f9;
+  --card-secondary: #e2e8f0;
+  --border: #e2e8f0;
+  --border-light: #cbd5e1;
+  --text-muted: #64748b;
+  --text-secondary: #94a3b8;
+  --selected: #e11d48;
+  --selected-dark: #be123c;
+  --disabled: #cbd5e1;
 }
 
 @layer base {
