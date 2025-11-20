@@ -21,6 +21,7 @@ export interface Movie {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  status: string;
 }
 
 export interface GetMoviesParams {
@@ -29,6 +30,7 @@ export interface GetMoviesParams {
   search?: string;
   rating?: number;
   genreQuery?: string;
+  status?: string;
   isActive?: boolean;
 }
 
