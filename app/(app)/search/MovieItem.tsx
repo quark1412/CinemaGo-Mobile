@@ -1,3 +1,4 @@
+import { useTheme } from "@/contexts/themeContext";
 import type { Genre } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons"; // Để dùng icon ngôi sao
 import { memo } from "react";
@@ -27,28 +28,39 @@ function MovieItemCmp({
   genres,
 }: MovieItemProps) {
   const genreText = genres?.map((g) => g.name).join(", ");
+  const { isDark } = useTheme();
+  // Theme-aware colors
+  const bgColor = isDark ? "bg-slate-800" : "bg-gray-100";
+  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
+  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
+  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
+  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
+  const iconColor = isDark ? "#fff" : "#0f172a";
+
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      className="mb-4 ml-2 w-[48%]"
+      className={`mb-4 w-[48%] }`}
       onPress={() => onPress?.(id)}
     >
-      <View className="rounded-xl overflow-hidden shadow-sm bg-white">
+      <View className={`rounded-xl overflow-hidden shadow-sm `}>
         <Image
           source={{ uri: poster || FALLBACK_POSTER }}
           style={{
-            width: "95%",
+            width: "100%",
             height: 220,
             backgroundColor: "#eee",
           }}
-          className="rounded-xl"
+          className="rounded-t-xl"
         />
 
-        <View className="p-2">
+        <View className={`p-2 ${cardBg}`}>
           {!!rating && (
             <View className="flex-row items-center mb-1">
-              <Ionicons name="star" size={14} color="#FFD700" />{" "}
-              <Text className="ml-1 text-[13px] font-bold text-orange-500">
+              <Ionicons name="star" size={14} color="#FFD700" />
+              <Text className="ml-1 text-[13px] font-[bold] text-orange-500">
                 {rating.toFixed(1)}
               </Text>
               {!!reviewCount && (
@@ -62,8 +74,8 @@ function MovieItemCmp({
 
           {/* Tên phim */}
           <Text
-            className="font-[bold] text-[15px] leading-tight"
-            numberOfLines={2}
+            className={`font-[bold] text-[15px] leading-tight ${textColor}`}
+            numberOfLines={1}
           >
             {title}
           </Text>
@@ -71,7 +83,7 @@ function MovieItemCmp({
           {/* Thể loại */}
           {!!genres && (
             <Text
-              className="text-gray-500 text-[13px] mt-0.5 font-[medium]"
+              className="text-gray-400 text-[13px] mt-0.5 font-[medium]"
               numberOfLines={1}
             >
               {genreText}

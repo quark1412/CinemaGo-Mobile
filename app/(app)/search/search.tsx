@@ -1,9 +1,12 @@
+import { useTheme } from "@/contexts/themeContext";
+import { genreService } from "@/services/genre";
 import { movieService } from "@/services/movie";
-import type { Movie } from "@/types/movie";
+import type { Genre, GetMoviesParams, Movie } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   ScrollView,
   Text,
@@ -14,87 +17,97 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MovieItem } from "./MovieItem";
 
-// --- CẤU HÌNH DỮ LIỆU FILTER ---
 const STATUS_OPTIONS = [
   { id: "all", label: "Tất cả" },
-  { id: "now_showing", label: "Đang chiếu" },
-  { id: "coming_soon", label: "Sắp chiếu" },
-];
-
-// Bạn nên thay ID này bằng ID thật trong database của bạn
-const GENRE_OPTIONS = [
-  { id: "28", name: "Hành động" },
-  { id: "12", name: "Phiêu lưu" },
-  { id: "16", name: "Hoạt hình" },
-  { id: "35", name: "Hài" },
-  { id: "18", name: "Chính kịch" },
-  { id: "10751", name: "Gia đình" },
-  { id: "14", name: "Giả tưởng" },
-  { id: "27", name: "Kinh dị" },
-  { id: "10749", name: "Lãng mạn" },
-  { id: "878", name: "Viễn tưởng" },
+  { id: "NOW_SHOWING", label: "Đang chiếu" },
+  { id: "COMING_SOON", label: "Sắp chiếu" },
 ];
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { isDark } = useTheme();
 
-  // State dữ liệu
-  const [keyword, setKeyword] = useState("");
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [genreOptions, setGenreOptions] = useState<Genre[]>([]); // Data Genre từ API
+  const [isLoading, setIsLoading] = useState(false);
 
-  // State Filter
+  // --- STATE FILTER ---
+  const [keyword, setKeyword] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [minRating, setMinRating] = useState(0); // 0 - 10
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]); // Mảng chứa ID thể loại
+  const [minRating, setMinRating] = useState(0);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // 1. Lấy dữ liệu thật
+  const [appliedStatus, setAppliedStatus] = useState("all");
+  const [appliedRating, setAppliedRating] = useState(0);
+  const [appliedGenres, setAppliedGenres] = useState<string[]>([]);
+
+  //genre
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchGenres = async () => {
       try {
-        const data = await movieService.getAllMovies();
-        setMovies(data.data || []);
+        const res = await genreService.getAllGenres({ page: 1, limit: 100 });
+
+        setGenreOptions(res.data || []);
       } catch (error) {
-        console.error("Lỗi khi tải danh sách phim:", error);
+        console.error("Lỗi tải Genre:", error);
       }
     };
-    fetchMovies();
+    fetchGenres();
   }, []);
 
-  // 2. Xử lý Logic Lọc (Dùng useMemo để tối ưu hiệu năng)
-  const filteredMovies = useMemo(() => {
-    return movies.filter((m: Movie) => {
-      // A. Lọc theo tên (không phân biệt hoa thường)
-      const matchName = m.title?.toLowerCase().includes(keyword.toLowerCase());
+  useEffect(() => {
+    // Hàm gọi API
+    const fetchMovies = async () => {
+      setIsLoading(true);
+      try {
+        // Chuẩn bị params gửi lên Backend khớp với req.query
+        const params: GetMoviesParams = {
+          page: 1,
+          limit: 20, // Lấy 20 phim
+          search: keyword.trim(),
+        };
 
-      // B. Lọc theo Rating (Lớn hơn hoặc bằng rating đã chọn)
-      const currentRating = m.rating || 0;
-      const matchRating = currentRating >= minRating;
+        if (appliedRating > 0) {
+          params.rating = appliedRating;
+        }
 
-      // C. Lọc theo Genre (Multi-select)
-      // Nếu có chọn genre -> Phim phải có ÍT NHẤT 1 genre nằm trong danh sách đã chọn
-      let matchGenre = true;
-      if (selectedGenres.length > 0 && m.genres) {
-        // Lưu ý: So sánh ID dưới dạng string để an toàn
-        matchGenre = m.genres.some(
-          (g) => selectedGenres.includes(String(g.id)) // hoặc g._id tuỳ API
-        );
+        if (appliedStatus !== "all") {
+          params.status = appliedStatus;
+        }
+
+        if (appliedGenres.length > 0) {
+          params.genreQuery = appliedGenres.join(",");
+        }
+
+        console.log(params);
+
+        const res = await movieService.getAllMovies(params);
+
+        setMovies(res.data || []);
+      } catch (error) {
+        console.error("Lỗi tìm kiếm phim:", error);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      // D. Lọc theo Status
-      // *Lưu ý*: Bạn cần map logic này với trường dữ liệu thật (ví dụ: m.status hoặc m.releaseDate)
-      let matchStatus = true;
-      if (selectedStatus === "now_showing") {
-        matchStatus = m.status === "released" || m.status === "Now Showing";
-      } else if (selectedStatus === "coming_soon") {
-        matchStatus = m.status === "upcoming" || m.status === "Coming Soon";
-      }
+    const timeoutId = setTimeout(() => {
+      fetchMovies();
+    }, 500);
 
-      return matchName && matchRating && matchGenre && matchStatus;
-    });
-  }, [movies, keyword, minRating, selectedGenres, selectedStatus]);
+    return () => clearTimeout(timeoutId);
+  }, [keyword, appliedStatus, appliedRating, appliedGenres]);
 
-  // Helper: Chọn/Bỏ chọn Genre
+  const toggleFilterPanel = () => {
+    if (!showFilter) {
+      setSelectedStatus(appliedStatus);
+      setMinRating(appliedRating);
+      setSelectedGenres(appliedGenres);
+    }
+    setShowFilter(!showFilter);
+  };
+
   const toggleGenre = (id: string) => {
     if (selectedGenres.includes(id)) {
       setSelectedGenres(selectedGenres.filter((gId) => gId !== id));
@@ -103,24 +116,41 @@ export default function SearchScreen() {
     }
   };
 
-  // Helper: Reset Filter
   const resetFilters = () => {
     setSelectedStatus("all");
     setMinRating(0);
     setSelectedGenres([]);
+    setKeyword("");
   };
+
+  const applyFilters = () => {
+    setAppliedStatus(selectedStatus);
+    setAppliedRating(minRating);
+    setAppliedGenres(selectedGenres);
+    setShowFilter(false); // Đóng panel
+  };
+
+  // Theme-aware colors
+  const bgColor = isDark ? "bg-slate-950" : "bg-white";
+  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
+  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
+  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
+  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
+  const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView edges={["top"]} className="flex-1 bg-white">
+      <SafeAreaView edges={["top"]} className={`flex-1  ${bgColor}`}>
         <View className="flex-1">
           {/* --- HEADER SEARCH --- */}
-          <View className="px-4 z-10 bg-white pb-2 shadow-sm">
+          <View className={`px-4 z-10  ${bgColor} pb-2 shadow-sm`}>
             <View className="flex-row items-center mt-2 mb-2">
               <TouchableOpacity onPress={() => router.back()} className="mr-3">
-                <Ionicons name="arrow-back" size={24} color="black" />
+                <Ionicons name="arrow-back" size={24} color={iconColor} />
               </TouchableOpacity>
 
               <View className="flex-1 bg-gray-100 rounded-xl px-3 py-1 flex-row items-center">
@@ -132,9 +162,10 @@ export default function SearchScreen() {
                 />
                 <TextInput
                   placeholder="Tìm phim, rạp..."
-                  className="flex-1 py-2 text-[15px] font-[medium] text-black"
+                  className="flex-1 py-2 text-[15px] font-medium text-black"
                   value={keyword}
                   onChangeText={setKeyword}
+                  returnKeyType="search"
                 />
                 {keyword.length > 0 && (
                   <TouchableOpacity onPress={() => setKeyword("")}>
@@ -143,10 +174,14 @@ export default function SearchScreen() {
                 )}
               </View>
 
-              {/* Nút mở Filter */}
+              {/* Toggle Filter Button */}
               <TouchableOpacity
-                onPress={() => setShowFilter(!showFilter)}
-                className={`ml-3 p-2 rounded-lg border ${showFilter ? "bg-orange-50 border-orange-500" : "bg-white border-gray-200"}`}
+                onPress={toggleFilterPanel}
+                className={`ml-3 p-2 rounded-lg border ${
+                  showFilter
+                    ? "bg-orange-50 border-orange-500"
+                    : "bg-white border-gray-200"
+                }`}
               >
                 <Ionicons
                   name="options-outline"
@@ -156,15 +191,15 @@ export default function SearchScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* --- FILTER PANEL (EXPANDABLE) --- */}
+            {/* --- FILTER PANEL --- */}
             {showFilter && (
               <View className="mt-2">
                 <ScrollView
                   style={{ maxHeight: 450 }}
                   showsVerticalScrollIndicator={false}
                 >
-                  {/* 1. Status */}
-                  <Text className="font-bold text-[14px] mb-2 text-gray-800">
+                  {/* 1. Status Filter */}
+                  <Text className={`font-[bold] text-[14px] mb-2 ${textColor}`}>
                     Trạng thái
                   </Text>
                   <View className="flex-row mb-4">
@@ -187,10 +222,10 @@ export default function SearchScreen() {
                     ))}
                   </View>
 
-                  {/* 2. Rating (0-10) */}
+                  {/* 2. Rating Filter */}
                   <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-bold text-[14px] text-gray-800">
-                      Điểm đánh giá (tối thiểu)
+                    <Text className={`font-[bold] text-[14px] ${textColor}`}>
+                      Điểm đánh giá
                     </Text>
                     <Text className="text-orange-500 font-bold">
                       {minRating}/10{" "}
@@ -221,34 +256,41 @@ export default function SearchScreen() {
                     ))}
                   </ScrollView>
 
-                  {/* 3. Genres (Multi-select) */}
-                  <Text className="font-bold text-[14px] mb-2 text-gray-800">
+                  {/* 3. Genres Filter */}
+                  <Text className={`font-[bold] text-[14px] mb-2 ${textColor}`}>
                     Thể loại
                   </Text>
                   <View className="flex-row flex-wrap gap-2 mb-4">
-                    {GENRE_OPTIONS.map((g) => {
-                      const isSelected = selectedGenres.includes(g.id);
-                      return (
-                        <TouchableOpacity
-                          key={g.id}
-                          onPress={() => toggleGenre(g.id)}
-                          className={`px-3 py-2 rounded-lg border ${
-                            isSelected
-                              ? "bg-orange-50 border-orange-500"
-                              : "bg-white border-gray-200"
-                          }`}
-                        >
-                          <Text
-                            className={`text-[12px] font-medium ${isSelected ? "text-orange-600" : "text-gray-600"}`}
+                    {genreOptions.length > 0 ? (
+                      genreOptions.map((g) => {
+                        const gId = String(g.id);
+                        const isSelected = selectedGenres.includes(gId);
+                        return (
+                          <TouchableOpacity
+                            key={gId}
+                            onPress={() => toggleGenre(gId)}
+                            className={`px-3 py-2 rounded-lg border ${
+                              isSelected
+                                ? "bg-orange-50 border-orange-500"
+                                : "bg-white border-gray-200"
+                            }`}
                           >
-                            {g.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                            <Text
+                              className={`text-[12px] font-medium ${isSelected ? "text-orange-600" : "text-gray-600"}`}
+                            >
+                              {g.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <Text className="text-gray-400 italic text-sm">
+                        Đang tải thể loại...
+                      </Text>
+                    )}
                   </View>
 
-                  {/* Button Actions */}
+                  {/* Action Buttons */}
                   <View className="flex-row gap-3 mb-2">
                     <TouchableOpacity
                       onPress={resetFilters}
@@ -256,13 +298,13 @@ export default function SearchScreen() {
                     >
                       <Text className="font-medium text-gray-600">Đặt lại</Text>
                     </TouchableOpacity>
+
+                    {/* Nút Áp dụng gọi hàm applyFilters */}
                     <TouchableOpacity
-                      onPress={() => setShowFilter(false)}
+                      onPress={applyFilters}
                       className="flex-1 bg-orange-500 py-3 rounded-xl items-center"
                     >
-                      <Text className="font-bold text-white">
-                        Áp dụng ({filteredMovies.length})
-                      </Text>
+                      <Text className="font-bold text-white">Áp dụng</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -271,39 +313,47 @@ export default function SearchScreen() {
           </View>
 
           {/* --- RESULT LIST --- */}
-          <View className="flex-1 px-4 bg-gray-50 pt-4">
-            <FlatList
-              data={filteredMovies}
-              numColumns={2}
-              columnWrapperStyle={{ justifyContent: "space-between" }}
-              keyExtractor={(item) => `movie-${item.id}`}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={
-                <View className="mt-10 items-center justify-center">
-                  <Ionicons name="film-outline" size={48} color="#d1d5db" />
-                  <Text className="text-gray-500 mt-2">
-                    Không tìm thấy kết quả nào
-                  </Text>
-                </View>
-              }
-              renderItem={({ item }) => (
-                <MovieItem
-                  id={String(item.id)}
-                  title={item.title}
-                  poster={item.thumbnail}
-                  rating={item.rating || 2}
-                  // Truyền mảng genres để MovieItem tự map
-                  genres={item.genres}
-                  onPress={(id) =>
-                    router.push({
-                      pathname: "/(app)/movies/[id]",
-                      params: { id },
-                    })
-                  }
-                />
-              )}
-            />
+          <View className={`flex-1 px-4 ${bgColor} pt-4`}>
+            {isLoading ? (
+              <View className="mt-20 items-center">
+                <ActivityIndicator size="large" color="#f97316" />
+                <Text className="text-gray-400 mt-2 text-xs">
+                  Đang tìm kiếm...
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={movies}
+                numColumns={2}
+                columnWrapperStyle={{ justifyContent: "space-between" }}
+                keyExtractor={(item) => `movie-${item.id}`}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <View className="mt-10 items-center justify-center">
+                    <Ionicons name="film-outline" size={48} color="#d1d5db" />
+                    <Text className="text-gray-500 mt-2">
+                      Không tìm thấy kết quả nào
+                    </Text>
+                  </View>
+                }
+                renderItem={({ item }) => (
+                  <MovieItem
+                    id={String(item.id)}
+                    title={item.title}
+                    poster={item.thumbnail}
+                    rating={item.rating || 1}
+                    genres={item.genres}
+                    onPress={(id) =>
+                      router.push({
+                        pathname: "/(app)/movies/[id]",
+                        params: { id },
+                      })
+                    }
+                  />
+                )}
+              />
+            )}
           </View>
         </View>
       </SafeAreaView>
