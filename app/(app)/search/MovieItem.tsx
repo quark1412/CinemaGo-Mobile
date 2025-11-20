@@ -30,14 +30,8 @@ function MovieItemCmp({
   const genreText = genres?.map((g) => g.name).join(", ");
   const { isDark } = useTheme();
   // Theme-aware colors
-  const bgColor = isDark ? "bg-slate-800" : "bg-gray-100";
   const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
-  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
-  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
-  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
-  const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (
     <TouchableOpacity

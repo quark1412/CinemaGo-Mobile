@@ -44,49 +44,97 @@ export default function SearchScreen() {
 
   //genre
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchGenres = async () => {
       try {
-        const res = await genreService.getAllGenres({ page: 1, limit: 100 });
+        const allGenres: Genre[] = [];
+        let page = 1;
+        const limit = 10;
+        let hasNextPage = true;
 
-        setGenreOptions(res.data || []);
+        while (hasNextPage && !isCancelled) {
+          const res = await genreService.getAllGenres({ page, limit });
+
+          const data = res.data ?? [];
+          const pagination = res.pagination;
+
+          console.log("Call page:", pagination);
+          allGenres.push(...data);
+
+          if (!pagination || !pagination.hasNextPage) {
+            hasNextPage = false;
+          } else {
+            page = (pagination.currentPage ?? page) + 1;
+          }
+        }
+        if (!isCancelled) {
+          setGenreOptions(allGenres);
+        }
       } catch (error) {
-        console.error("Lỗi tải Genre:", error);
+        if (!isCancelled) {
+          console.error("Lỗi tải Genre:", error);
+          setGenreOptions([]);
+        }
       }
     };
     fetchGenres();
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    // Hàm gọi API
+    let isCancelled = false;
     const fetchMovies = async () => {
       setIsLoading(true);
       try {
-        // Chuẩn bị params gửi lên Backend khớp với req.query
-        const params: GetMoviesParams = {
-          page: 1,
-          limit: 20, // Lấy 20 phim
-          search: keyword.trim(),
-        };
+        const allMovies: Movie[] = [];
+        let page = 1;
+        let hasNextPage = true;
 
-        if (appliedRating > 0) {
-          params.rating = appliedRating;
+        while (hasNextPage && !isCancelled) {
+          const params: GetMoviesParams = {
+            page,
+            limit: 5,
+            search: keyword.trim() || undefined,
+          };
+
+          if (appliedRating > 0) {
+            params.rating = appliedRating;
+          }
+
+          if (appliedStatus !== "all") {
+            params.status = appliedStatus;
+          }
+
+          if (appliedGenres.length > 0) {
+            params.genreQuery = appliedGenres.join(",");
+          }
+
+          console.log("Call page:", page, params);
+
+          const res = await movieService.getAllMovies(params);
+          const data = res.data ?? [];
+          const pagination = res.pagination;
+
+          allMovies.push(...data);
+
+          // kiểm tra còn trang tiếp không
+          if (!pagination || !pagination.hasNextPage) {
+            hasNextPage = false;
+          } else {
+            // backend có thể normalize currentPage
+            page = (pagination.currentPage ?? page) + 1;
+          }
         }
 
-        if (appliedStatus !== "all") {
-          params.status = appliedStatus;
+        if (!isCancelled) {
+          setMovies(allMovies);
         }
-
-        if (appliedGenres.length > 0) {
-          params.genreQuery = appliedGenres.join(",");
-        }
-
-        console.log(params);
-
-        const res = await movieService.getAllMovies(params);
-
-        setMovies(res.data || []);
       } catch (error) {
         console.error("Lỗi tìm kiếm phim:", error);
+        setMovies([]);
       } finally {
         setIsLoading(false);
       }
@@ -132,12 +180,7 @@ export default function SearchScreen() {
 
   // Theme-aware colors
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
-  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
-  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
-  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
-  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
   const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (

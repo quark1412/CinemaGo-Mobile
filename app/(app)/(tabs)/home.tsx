@@ -1,3 +1,4 @@
+import { useTheme } from "@/contexts/themeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -131,6 +132,7 @@ const nowShowing = [
 
 export default function Home() {
   const router = useRouter();
+  const { isDark } = useTheme();
 
   const x = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
@@ -239,7 +241,7 @@ export default function Home() {
             />
 
             <Text
-              className="absolute bottom-2 left-3 text-white font-extrabold"
+              className={`absolute bottom-2 left-3 text-white font-extrabold`}
               style={{
                 fontSize: 64,
                 textShadowColor: "#000",
@@ -252,7 +254,7 @@ export default function Home() {
           </View>
 
           <View className="mt-2 items-center justify-center">
-            <Text className="text-lg font-bold text-black text-center">
+            <Text className={`text-lg font-[bold] ${textColor} text-center`}>
               {item.title}
             </Text>
             <Text className="text-sm text-gray-500 text-center">
@@ -304,7 +306,7 @@ export default function Home() {
 
           {/* Title */}
           <Text
-            className="text-[14px] font-bold text-black mt-1"
+            className={`text-[14px] font-[bold] ${textColor} mt-1`}
             numberOfLines={1}
           >
             {item.title}
@@ -319,15 +321,31 @@ export default function Home() {
     );
   };
 
+  // Theme-aware colors
+  const bgColor = isDark ? "bg-slate-950" : "bg-white";
+  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
+  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
+  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
+  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
+  const iconColor = isDark ? "#fff" : "#0f172a";
+
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+    <SafeAreaView
+      edges={["top"]}
+      style={{ flex: 1 }}
+      className={`flex-1 ${bgColor}`}
+    >
       <StatusBar barStyle="dark-content" />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View>
           {/* Header */}
           <View className="px-4 pt-2 pb-1">
-            <Text className="text-[22px] font-bold">Mua vé xem phim</Text>
+            <Text className={`text-[22px] font-[bold] ${textColor}`}>
+              Mua vé xem phim
+            </Text>
           </View>
 
           <View className="px-4 mt-3">
@@ -348,7 +366,9 @@ export default function Home() {
 
           {/* Phim nổi bật */}
           <View className="px-4 mb-2">
-            <Text className="text-[20px] font-bold">Phim nổi bật</Text>
+            <Text className={`text-[20px] font-[bold] ${textColor}`}>
+              Phim nổi bật
+            </Text>
           </View>
 
           {/* Carousel */}
@@ -378,7 +398,9 @@ export default function Home() {
 
           {/* Section khác */}
           <View className="px-4 mt-5 mb-3 flex-row justify-between items-center">
-            <Text className="text-[20px] font-bold">Phim hay đang chiếu</Text>
+            <Text className={`text-[20px] font-[bold] ${textColor}`}>
+              Phim hay đang chiếu
+            </Text>
             <TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push("/(app)/movies/now-showing")}
