@@ -1,8 +1,11 @@
 import { useTheme } from "@/contexts/themeContext";
+import { movieService } from "@/services/movie";
+import type { Movie } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -21,125 +24,85 @@ const SPACING = 16;
 const CARD_W = width * 0.72;
 const CARD_H = CARD_W * 1.45;
 
-const featured = [
-  {
-    id: "1",
-    title: "G-DRAGON IN CINEMA",
-    description: "Tài liệu, Nhạc",
-    thumbnail:
-      "https://images.unsplash.com/photo-1516280030429-27679b3dc9cf?q=80&w=1200&auto=format&fit=crop",
-    rank: 1,
-  },
-  {
-    id: "2",
-    title: "Ngôi Làng Cổ Thụ",
-    description: "Kinh dị",
-    thumbnail:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    rank: 2,
-  },
-  {
-    id: "3",
-    title: "Kẻ Săn Bóng Đêm",
-    description: "Hành động",
-    thumbnail:
-      "https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?q=80&w=1200&auto=format&fit=crop",
-    rank: 3,
-  },
-  {
-    id: "4",
-    title: "Ngọn Đồi Im Lặng",
-    description: "Tâm lý",
-    thumbnail:
-      "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1200&auto=format&fit=crop",
-    rank: 4,
-  },
-  {
-    id: "5",
-    title: "Thành Phố Đom Đóm",
-    description: "Hoạt hình",
-    thumbnail:
-      "https://images.unsplash.com/photo-1503437313881-503a91226402?q=80&w=1200&auto=format&fit=crop",
-    rank: 5,
-  },
-];
-
-const nowShowing = [
-  {
-    id: "11",
-    title: "Phá Đám: Sinh Nhật Mẹ",
-    genre: "Chính Kịch, Gia Đình",
-    rating: 7.6,
-    reviews: 297,
-    thumbnail:
-      "https://images.unsplash.com/photo-1542202229-7d93c33f5d07?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "12",
-    title: "Mục Sư, Thầy Đỡ Đẻ & Con Quỷ Ám Trì",
-    genre: "Kinh Dị, Hành Động",
-    rating: 8.7,
-    reviews: 173,
-    thumbnail:
-      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "13",
-    title: "Bịt Mắt Ngủ Dưới Mồ",
-    genre: "Hành động",
-    rating: 7.1,
-    reviews: 110,
-    thumbnail:
-      "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "14",
-    title: "Mục Sư, Thầy Đỡ Đẻ & Con Quỷ Ám Trì",
-    genre: "Kinh Dị, Hành Động",
-    rating: 8.7,
-    reviews: 173,
-    thumbnail:
-      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "15",
-    title: "Bịt Mắt Ngủ Dưới Mồ",
-    genre: "Hành động",
-    rating: 7.1,
-    reviews: 110,
-    thumbnail:
-      "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "16",
-    title: "Mục Sư, Thầy Đỡ Đẻ & Con Quỷ Ám Trì",
-    genre: "Kinh Dị, Hành Động",
-    rating: 8.7,
-    reviews: 173,
-    thumbnail:
-      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "17",
-    title: "Bịt Mắt Ngủ Dưới Mồ",
-    genre: "Hành động",
-    rating: 7.1,
-    reviews: 110,
-    thumbnail:
-      "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?q=80&w=1200&auto=format&fit=crop",
-  },
-];
-
 export default function Home() {
   const router = useRouter();
   const { isDark } = useTheme();
 
+  const [featuredMovies, setFeaturedMovies] = useState<Movie[]>([]);
+  const [nowShowingMovies, setNowShowingMovies] = useState<Movie[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const fetchNowShowingMovies = async () => {
+      try {
+        setIsLoading(true);
+
+        const all: Movie[] = [];
+        let page = 1;
+        const limit = 20;
+        let hasNextPage = true;
+
+        while (hasNextPage && !isCancelled) {
+          const res = await movieService.getAllMovies({
+            page,
+            limit,
+            status: "NOW_SHOWING",
+          });
+
+          const data = (res.data ?? []) as Movie[];
+          const pagination = res.pagination;
+
+          all.push(...data);
+
+          if (!pagination || !pagination.hasNextPage) {
+            hasNextPage = false;
+          } else {
+            page = (pagination.currentPage ?? page) + 1;
+          }
+        }
+
+        if (isCancelled) return;
+
+        const sorted = [...all].sort(
+          (a, b) => (b.rating ?? 0) - (a.rating ?? 0)
+        );
+
+        const featured = sorted.slice(0, 5);
+        let remaining = sorted.slice(5);
+
+        if (remaining.length === 0) {
+          remaining = featured;
+        }
+
+        setFeaturedMovies(featured);
+        setNowShowingMovies(remaining);
+      } catch (e) {
+        console.error("Lỗi tải phim NOW_SHOWING:", e);
+        if (!isCancelled) {
+          setFeaturedMovies([]);
+          setNowShowingMovies([]);
+        }
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    };
+
+    fetchNowShowingMovies();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   const x = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
 
-  //  tạo loop data
-  const LOOP_DATA = [...featured, ...featured, ...featured];
-  const START_INDEX = featured.length;
+  const LOOP_DATA = featuredMovies.length
+    ? [...featuredMovies, ...featuredMovies, ...featuredMovies]
+    : [];
+  const START_INDEX = featuredMovies.length;
   const ITEM_SIZE = CARD_W + SPACING;
 
   const indexRef = useRef(START_INDEX);
@@ -148,33 +111,35 @@ export default function Home() {
     router.push("/(app)/search/search");
   }
 
+  const scrollToMiddle = useCallback(() => {
+    if (!featuredMovies.length) return;
+
+    flatListRef.current?.scrollToOffset({
+      offset: START_INDEX * ITEM_SIZE,
+      animated: false,
+    });
+  }, [ITEM_SIZE, START_INDEX, featuredMovies.length]);
+
   useEffect(() => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({
-        offset: START_INDEX * ITEM_SIZE,
-        animated: false,
-      });
-    }, 0);
-  }, []);
+    scrollToMiddle();
+  }, [scrollToMiddle]);
 
   const onMomentumScrollEnd = (event: any) => {
+    if (!featuredMovies.length) return;
     const offsetX = event.nativeEvent.contentOffset.x;
 
-    // Tính index mới
     let index = Math.round(offsetX / ITEM_SIZE);
     indexRef.current = index;
 
-    // Snap về index đúng
     flatListRef.current?.scrollToOffset({
       offset: index * ITEM_SIZE,
       animated: true,
     });
 
-    // Xử lý loop
     setTimeout(() => {
-      // Lấy về index gốc trong mảng featured (0-4)
       const baseIndex =
-        ((index % featured.length) + featured.length) % featured.length;
+        ((index % featuredMovies.length) + featuredMovies.length) %
+        featuredMovies.length;
       const newIndex = START_INDEX + baseIndex;
 
       if (newIndex !== index) {
@@ -187,14 +152,7 @@ export default function Home() {
     }, 50);
   };
 
-  const scrollToMiddle = () => {
-    flatListRef.current?.scrollToOffset({
-      offset: START_INDEX * ITEM_SIZE,
-      animated: false,
-    });
-  };
-
-  const renderFeatured = ({ item, index }: any) => {
+  const renderFeatured = ({ item, index }: { item: Movie; index: number }) => {
     const inputRange = [
       (index - 1) * ITEM_SIZE,
       index * ITEM_SIZE,
@@ -207,6 +165,17 @@ export default function Home() {
       extrapolate: "clamp",
     });
 
+    const isEmpty = featuredMovies.length === 0;
+    const baseIndex = isEmpty
+      ? 0
+      : ((index % featuredMovies.length) + featuredMovies.length) %
+        featuredMovies.length;
+    const rank = baseIndex + 1;
+
+    const thumbnail = (item as any).poster ?? (item as any).thumbnail;
+    const genreText = Array.isArray((item as any).genres)
+      ? (item as any).genres.map((g: any) => g.name).join(", ")
+      : ((item as any).genre ?? "");
     return (
       <TouchableOpacity
         onPress={() =>
@@ -215,9 +184,9 @@ export default function Home() {
             params: {
               id: item.id,
               title: item.title,
-              thumbnail: item.thumbnail,
-              description: item.description,
-              rating: item.rank,
+              thumbnail,
+              description: (item as any).description ?? "",
+              rating: item.rating ?? 0,
             },
           })
         }
@@ -235,13 +204,13 @@ export default function Home() {
             style={{ width: "100%", height: CARD_H * 0.85 }}
           >
             <Image
-              source={{ uri: item.thumbnail }}
+              source={{ uri: thumbnail }}
               style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
             />
 
             <Text
-              className={`absolute bottom-2 left-3 text-white font-extrabold`}
+              className="absolute bottom-2 left-3 text-white font-extrabold"
               style={{
                 fontSize: 64,
                 textShadowColor: "#000",
@@ -249,7 +218,7 @@ export default function Home() {
                 textShadowRadius: 3,
               }}
             >
-              {item.rank}
+              {rank}
             </Text>
           </View>
 
@@ -257,16 +226,28 @@ export default function Home() {
             <Text className={`text-lg font-[bold] ${textColor} text-center`}>
               {item.title}
             </Text>
-            <Text className="text-sm text-gray-500 text-center">
-              {item.description}
-            </Text>
+            {genreText && (
+              <Text
+                className="text-sm text-gray-500 text-center"
+                numberOfLines={1}
+              >
+                {genreText}
+              </Text>
+            )}
           </View>
         </Animated.View>
       </TouchableOpacity>
     );
   };
 
-  const renderNowShowing = ({ item }: any) => {
+  const renderNowShowing = ({ item }: { item: Movie }) => {
+    const rating = item.rating ?? 0;
+    const reviews = (item as any).reviewCount ?? (item as any).reviews ?? 0;
+    const thumbnail = (item as any).poster ?? (item as any).thumbnail;
+    const genreText = Array.isArray((item as any).genres)
+      ? (item as any).genres.map((g: any) => g.name).join(", ")
+      : ((item as any).genre ?? "");
+
     return (
       <TouchableOpacity
         onPress={() =>
@@ -275,17 +256,16 @@ export default function Home() {
             params: {
               id: item.id,
               title: item.title,
-              thumbnail: item.thumbnail,
-              description: item.description,
-              rating: item.rank,
+              thumbnail,
+              description: (item as any).description ?? "",
+              rating,
             },
           })
         }
       >
         <View className="mr-4" style={{ width: 140 }}>
-          {/* Poster */}
           <Image
-            source={{ uri: item.thumbnail }}
+            source={{ uri: thumbnail }}
             style={{
               width: "100%",
               height: 200,
@@ -294,17 +274,13 @@ export default function Home() {
             resizeMode="cover"
           />
 
-          {/* Rating */}
           <View className="flex-row items-center mt-1">
             <Text className="text-[13px] font-semibold text-orange-500">
-              ⭐ {item.rating}
+              ⭐ {rating.toFixed(1)}
             </Text>
-            <Text className="text-[12px] text-gray-500 ml-1">
-              ({item.reviews})
-            </Text>
+            <Text className="text-[12px] text-gray-500 ml-1">({reviews})</Text>
           </View>
 
-          {/* Title */}
           <Text
             className={`text-[14px] font-[bold] ${textColor} mt-1`}
             numberOfLines={1}
@@ -312,38 +288,55 @@ export default function Home() {
             {item.title}
           </Text>
 
-          {/* Genre */}
-          <Text className="text-[12px] text-gray-500" numberOfLines={1}>
-            {item.genre}
-          </Text>
+          {!!genreText && (
+            <Text className="text-[12px] text-gray-500" numberOfLines={1}>
+              {genreText}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     );
   };
 
-  // Theme-aware colors
-  const bgColor = isDark ? "bg-slate-950" : "bg-white";
-  const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
-  const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
-  const borderColor = isDark ? "border-slate-800" : "border-slate-200";
-  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const textMuted = isDark ? "text-slate-400" : "text-slate-600";
   const iconColor = isDark ? "#fff" : "#0f172a";
+
+  if (
+    isLoading &&
+    featuredMovies.length === 0 &&
+    nowShowingMovies.length === 0
+  ) {
+    return (
+      <SafeAreaView
+        edges={["top"]}
+        style={{ flex: 1 }}
+        className={`flex-1 ${isDark ? "dark" : "light"} bg-background`}
+      >
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+          <Text className={`mt-2 text-[14px] ${textColor}`}>
+            Đang tải phim...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
       edges={["top"]}
       style={{ flex: 1 }}
-      className={`flex-1 ${bgColor}`}
+      className={`flex-1 ${isDark ? "dark" : "light"} bg-background`}
     >
       <StatusBar barStyle="dark-content" />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View>
-          {/* Header */}
           <View className="px-4 pt-2 pb-1">
-            <Text className={`text-[22px] font-[bold] ${textColor}`}>
+            <Text
+              className={`text-[22px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+            >
               Mua vé xem phim
             </Text>
           </View>
@@ -352,31 +345,31 @@ export default function Home() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={goSearch}
-              className="flex-row items-center bg-gray-100 rounded-xl px-3 py-2"
+              className={`flex-row items-center  ${isDark ? "dark" : "light"} bg-muted-background rounded-xl px-3 py-2`}
             >
-              <Ionicons name="search-outline" size={20} color="#555" />
+              <Ionicons name="search-outline" size={20} color={iconColor} />
               <TextInput
                 editable={false}
                 placeholder="Tìm kiếm phim hoặc rạp…"
-                className="ml-2 flex-1 text-[15px]"
+                placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+                className={`ml-2 flex-1 text-[15px] ${textColor}`}
                 pointerEvents="none"
               />
             </TouchableOpacity>
           </View>
 
-          {/* Phim nổi bật */}
           <View className="px-4 mb-2">
-            <Text className={`text-[20px] font-[bold] ${textColor}`}>
+            <Text
+              className={`text-[20px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+            >
               Phim nổi bật
             </Text>
           </View>
 
-          {/* Carousel */}
           <Animated.FlatList
             ref={flatListRef}
             onLayout={scrollToMiddle}
             data={LOOP_DATA}
-            // keyExtractor={(item, index) => `featured-${item.id}-${index}`}
             keyExtractor={(_, i) => String(i)}
             renderItem={renderFeatured}
             horizontal
@@ -396,9 +389,10 @@ export default function Home() {
             scrollEventThrottle={16}
           />
 
-          {/* Section khác */}
           <View className="px-4 mt-5 mb-3 flex-row justify-between items-center">
-            <Text className={`text-[20px] font-[bold] ${textColor}`}>
+            <Text
+              className={`text-[20px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+            >
               Phim hay đang chiếu
             </Text>
             <TouchableOpacity>
@@ -413,7 +407,7 @@ export default function Home() {
           </View>
 
           <FlatList
-            data={nowShowing}
+            data={nowShowingMovies}
             keyExtractor={(item) => item.id}
             renderItem={renderNowShowing}
             horizontal
