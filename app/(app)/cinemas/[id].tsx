@@ -1,372 +1,232 @@
-// app/screens/Showtimes.tsx
-import { generateDateOptions } from "@/utils/dayUtils";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
-  Image,
+  Linking,
+  Modal,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type RouteParams = { cinemaId: string; cinemaName: string };
-
-type ShowTime = {
-  id: string;
-  time: string;
-  end: string;
-  left: number;
-  total: number;
-};
-type Movie = {
-  id: string;
-  title: string;
-  subTitle?: string;
-  poster: string;
-  age: string;
-  formats: string[];
-  duration: string;
-  trailerUrl: string;
-  // Mỗi nhãn (label) sẽ có danh sách suất chiếu riêng
-  labels: {
-    name: string; // ví dụ: "2D Phụ đề · IMAX"
-    showtimes: ShowTime[];
-  }[];
-};
-
-const MOCK_MOVIES: Movie[] = [
-  {
-    id: "m1",
-    title: "G-DRAGON IN CINEMA",
-    subTitle: "[Übermensch]",
-    poster: "https://i.imgur.com/6vZQF2g.jpeg",
-    age: "13+",
-    formats: ["Tài Liệu", "Nhạc", "2D", "Dolby Atmos", "ScreenX", "4DX"],
-    duration: "1 giờ 46 phút",
-    labels: [
-      {
-        name: "2D Phụ đề · IMAX",
-        showtimes: [
-          { id: "st1", time: "17:30", end: "19:33", left: 268, total: 278 },
-          { id: "st2", time: "19:40", end: "21:43", left: 253, total: 278 },
-          { id: "st3", time: "17:30", end: "19:33", left: 268, total: 278 },
-          { id: "st4", time: "17:30", end: "19:33", left: 268, total: 278 },
-          { id: "st5", time: "17:30", end: "19:33", left: 268, total: 278 },
-        ],
-      },
-      {
-        name: "4DX Lồng tiếng",
-        showtimes: [
-          { id: "st3", time: "20:10", end: "22:15", left: 150, total: 278 },
-          { id: "st6", time: "20:10", end: "22:15", left: 150, total: 278 },
-          { id: "st7", time: "20:10", end: "22:15", left: 150, total: 278 },
-        ],
-      },
-    ],
-    trailerUrl:
-      "https://www.youtube.com/watch?v=jPjQJYKhhk4&list=RDMMjPjQJYKhhk4&start_radio=1",
-  },
-  {
-    id: "m2",
-    title: "Quái Thú Vô Hình: Vùng Đất Chết Chóc",
-    poster: "https://i.imgur.com/Xb4mM8H.jpeg",
-    age: "16+",
-    formats: ["Khoa Học Viễn Tưởng", "Hành Động", "2D", "3D", "4DX"],
-    duration: "1 giờ 46 phút",
-    labels: [
-      {
-        name: "2D Phụ đề · IMAX",
-        showtimes: [
-          { id: "st1", time: "17:30", end: "19:33", left: 268, total: 278 },
-          { id: "st2", time: "19:40", end: "21:43", left: 253, total: 278 },
-        ],
-      },
-      {
-        name: "4DX Lồng tiếng",
-        showtimes: [
-          { id: "st3", time: "20:10", end: "22:15", left: 150, total: 278 },
-        ],
-      },
-    ],
-    trailerUrl:
-      "https://www.youtube.com/watch?v=jPjQJYKhhk4&list=RDMMjPjQJYKhhk4&start_radio=1",
-  },
-];
-
-const DAYS = generateDateOptions();
-
-const TIME_FILTERS = [
-  { label: "00:00 - 03:00", start: 0, end: 3 },
-  { label: "03:00 - 06:00", start: 3, end: 6 },
-  { label: "06:00 - 09:00", start: 6, end: 9 },
-  { label: "09:00 - 12:00", start: 9, end: 12 },
-  { label: "12:00 - 15:00", start: 12, end: 15 },
-  { label: "15:00 - 18:00", start: 15, end: 18 },
-  { label: "18:00 - 21:00", start: 18, end: 21 },
-  { label: "21:00 - 24:00", start: 21, end: 24 },
-];
-
-const currentHour = new Date().getHours();
-
-// Lọc ra các khung giờ còn hiệu lực (chưa kết thúc)
-const visibleTimeFilters = TIME_FILTERS.filter((t) => t.end >= currentHour);
+import MovieCard from "@/components/showtimes/movie-card";
+import { useTheme } from "@/contexts/themeContext";
+import type { MovieWithLabels } from "@/hook/useCinemaShowtimes";
+import { useCinemaShowtimes } from "@/hook/useCinemaShowtimes";
 
 export default function Showtimes() {
-  const route = useRoute<any>();
+  const { isDark } = useTheme();
   const navigation = useNavigation<any>();
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [currentTrailer, setCurrentTrailer] = useState<string | null>(null);
-
   const { id, cinemaName } = useLocalSearchParams<{
     id: string;
     cinemaName?: string;
   }>();
 
-  const [dayIdx, setDayIdx] = useState(0);
-  const [timeIdx, setTimeIdx] = useState(0);
+  const cinemaId = id as string;
 
-  const movies = useMemo(() => {
-    // TODO: lọc theo dayIdx/timeIdx nếu dữ liệu thật có khung giờ
-    return MOCK_MOVIES;
-  }, [dayIdx, timeIdx]);
+  const { cinema, movies, loadingCinema, loadingMovies } =
+    useCinemaShowtimes(cinemaId);
 
-  const pill = (
-    label: string,
-    active: boolean,
-    onPress: () => void,
-    small = false
-  ) => (
-    <Pressable
-      key={label}
-      onPress={onPress}
-      className={`px-3 ${small ? "h-7" : "h-9"} rounded-full border mr-2 items-center justify-center ${
-        active ? "bg-pink-100 border-pink-300" : "bg-white border-gray-200"
-      }`}
-    >
-      <Text
-        className={`font-semibold ${small ? "text-xs" : "text-sm"} ${active ? "text-pink-600" : "text-gray-700"}`}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [currentTrailer, setCurrentTrailer] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
-  const showtimeChip = (st: ShowTime) => (
-    <Pressable
-      key={st.id}
-      onPress={() => {
-        /* điều hướng chọn ghế */
-      }}
-      className="border border-gray-200 rounded-xl px-3 py-1.5 mr-2 mb-2"
-    >
-      <Text className="text-[13px] font-semibold">
-        {st.time} - {st.end}
-      </Text>
-      <Text className="text-[10px] text-gray-500">
-        Còn {st.left}/{st.total}
-      </Text>
-    </Pressable>
-  );
+  const player = useVideoPlayer(currentTrailer ?? null, (player) => {
+    if (currentTrailer) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  });
 
-  const movieCard = (m: Movie) => (
-    <View key={m.id} className="bg-white rounded-2xl p-3 mb-4 shadow-sm">
-      {/* ===== Header: Title + Chi tiết ===== */}
-      <View className="flex-row justify-between items-start mb-1">
-        <Text className="flex-1 text-[15px] font-extrabold pr-2 leading-tight">
-          {m.title}
-          {m.subTitle ? `\n${m.subTitle}` : ""}
-        </Text>
+  useEffect(() => {
+    if (showTrailer && currentTrailer) {
+      setVideoLoading(true);
+    } else {
+      setVideoLoading(false);
+    }
+  }, [showTrailer, currentTrailer]);
 
-        <Pressable
-          onPress={() => {
-            /* chuyển sang chi tiết phim */
-          }}
-        >
-          <Text className="text-pink-500 font-semibold">Chi tiết</Text>
-        </Pressable>
-      </View>
+  useEffect(() => {
+    if (!showTrailer) {
+      try {
+        player.pause();
+      } catch {}
+    }
+  }, [showTrailer, player]);
 
-      {/* ===== Info row: Age + Genre + Duration ===== */}
-      <View className="flex-row items-center mb-2">
-        <View className="bg-yellow-100 px-1.5 py-0.5 rounded-md mr-2">
-          <Text className="text-[11px] font-bold text-yellow-700">{m.age}</Text>
-        </View>
-        <Text className="text-[11px] text-gray-600 flex-1">
-          {m.formats.join(", ")} · {m.duration}
-        </Text>
-      </View>
+  const openDirection = () => {
+    if (!cinema) return;
 
-      {/* ===== Poster + Showtimes layout ===== */}
-      <View className="flex-row">
-        {/* Poster */}
-        <View className="w-[30%] mr-3">
-          <Image
-            source={{ uri: m.poster }}
-            className="w-full aspect-[2/3] rounded-xl"
-          />
+    const { latitude, longitude, address } = cinema;
+    let url = "";
 
-          {/* Trailer nằm sát poster */}
-          <Pressable
-            onPress={() => {
-              if (m.trailerUrl) {
-                setCurrentTrailer(m.trailerUrl);
-                setShowTrailer(true);
-              } else {
-                alert("Trailer hiện chưa có!");
-              }
-            }}
-            className="flex-row items-center mt-2"
-          >
-            <MaterialIcons name="ondemand-video" size={16} color="#E91E63" />
-            <Text className="ml-1 underline font-semibold text-pink-600 text-[13px]">
-              Trailer
-            </Text>
-          </Pressable>
-        </View>
+    if (latitude && longitude) {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    } else if (address) {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+        address
+      )}`;
+    } else return;
 
-        {/* Showtimes */}
-        <View className="flex-1">
-          {m.labels.map((group, idx) => (
-            <View key={group.name + idx} className="mb-3">
-              {/* Nhãn nhóm suất chiếu */}
-              <View className="bg-gray-100 rounded-md px-2 py-1 mb-2">
-                <Text className="text-[12px] font-semibold">{group.name}</Text>
-              </View>
+    Linking.openURL(url).catch((err) =>
+      console.log("Error opening maps direction:", err)
+    );
+  };
 
-              {/* Danh sách suất chiếu */}
-              <View className="flex-row flex-wrap gap-2">
-                {group.showtimes.map((st) => (
-                  <Pressable
-                    key={st.id}
-                    onPress={() => {
-                      // ví dụ router.push(`/booking/${st.id}`)
-                    }}
-                    className="px-3 py-2 bg-white rounded-lg border border-gray-200 shadow-sm"
-                  >
-                    <Text className="text-[13px] font-semibold text-gray-800">
-                      {st.time} - {st.end}
-                    </Text>
-                    <Text className="text-[11px] text-gray-500">
-                      Còn {st.left}/{st.total}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
+  const handleOpenTrailer = (url: string) => {
+    setCurrentTrailer(url);
+    setShowTrailer(true);
+  };
+
+  const handlePressShowtime = (st: any, movie: MovieWithLabels) => {
+    // navigation.navigate("Booking", { showtimeId: st.id, movieId: movie.id, cinemaId });
+    console.log("Chọn suất chiếu:", st.id, "phim:", movie.title);
+  };
+
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
-      {/* Header */}
-      <View className="px-3 pt-1 pb-3 bg-white">
-        <View className="flex-row items-center justify-between">
+    <SafeAreaView
+      className={`flex-1  ${isDark ? "dark" : "light"} bg-background`}
+    >
+      <View className={`px-3 pt-1 pb-3  ${isDark ? "#070f20" : "#fde2e8"} `}>
+        <View className="flex-row items-center ">
           <Pressable
             onPress={() => navigation.goBack()}
-            className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center"
+            className={`w-9 h-9 rounded-full  ${isDark ? "dark" : "light"} bg-background items-center justify-center`}
           >
-            <Ionicons name="chevron-back" size={20} />
+            <Ionicons name="chevron-back" size={20} color={iconColor} />
           </Pressable>
-          <Text className="text-[16px] font-extrabold">{cinemaName}</Text>
-          <View className="flex-row">
-            <Pressable className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center mr-2">
-              <Ionicons name="car-outline" size={18} />
-            </Pressable>
-            <Pressable className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center">
-              <Ionicons name="close" size={18} />
-            </Pressable>
-          </View>
+          <Text className={`text-[16px] font-[extraBold] ml-3 ${textColor}`}>
+            {cinemaName || cinema?.name || (loadingCinema ? "Đang tải..." : "")}
+          </Text>
         </View>
 
-        {/* Day pills */}
+        <View className="mt-3 px-3 flex-row items-start justify-between">
+          {loadingCinema ? (
+            <>
+              <View className="flex-1 mr-3">
+                <View className="w-24 h-3 rounded-full bg-gray-200 mb-2" />
+                <View className="w-44 h-3 rounded-full bg-gray-200" />
+              </View>
+              <View className="w-20 h-8 rounded-full bg-gray-200" />
+            </>
+          ) : (
+            <>
+              <View className="flex-1 mr-3">
+                <Text className="text-xs text-text-muted">
+                  {cinema?.city || ""}
+                </Text>
+                <Text
+                  className={`mt-1 text-sm font-[semibold] text-text ${textColor}`}
+                >
+                  {cinema?.address || ""}
+                </Text>
+              </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mt-3 px-3"
-        >
-          {DAYS.map((d, i) => {
-            const active = i === dayIdx;
-            return (
               <Pressable
-                key={d.fullDate}
-                onPress={() => setDayIdx(i)}
-                className={`mr-2 rounded-full border px-3 py-2 items-center justify-center
-          ${active ? "bg-pink-100 border-pink-300" : "bg-white border-gray-200"}`}
+                onPress={openDirection}
+                className="flex-row items-center px-3 py-2 rounded-full bg-primary/10"
                 hitSlop={8}
               >
-                {/* Dòng 1: Ngày (dd/mm) */}
-                <Text
-                  className={`text-[12px] font-extrabold leading-4 ${active ? "text-pink-600" : "text-gray-800"}`}
-                >
-                  {d.dayOfMonth}
-                </Text>
-                {/* Dòng 2: Thứ / H.nay */}
-                <Text
-                  className={`text-[11px] font-semibold leading-4 ${active ? "text-pink-600" : "text-gray-600"}`}
-                >
-                  {d.dayOfWeek}
+                <Ionicons name="car-outline" size={16} color={iconColor} />
+                <Text className="ml-1 text-xs font-semibold text-primary">
+                  Tìm đường
                 </Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* Time filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mt-2"
-        >
-          {visibleTimeFilters.map((t, i) =>
-            pill(t.label, i === timeIdx, () => setTimeIdx(i))
+            </>
           )}
-        </ScrollView>
+        </View>
       </View>
 
-      {/* Section Title */}
       <Text className="px-3 pt-3 pb-2 text-[12px] font-extrabold text-gray-500">
-        DANH SÁCH PHIM
+        {loadingMovies ? "ĐANG TẢI LỊCH CHIẾU..." : "DANH SÁCH PHIM"}
       </Text>
 
-      {/* Movies */}
-      <FlatList
-        data={movies}
-        keyExtractor={(m) => m.id}
-        renderItem={({ item }) => movieCard(item)}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
-      />
+      {loadingMovies ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" />
+          <Text className="mt-2 text-sm text-gray-500">
+            Đang tải lịch chiếu...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={movies}
+          keyExtractor={(m) => m.id}
+          renderItem={({ item }) => (
+            <MovieCard
+              movie={item}
+              onPressTrailer={handleOpenTrailer}
+              onPressShowtime={handlePressShowtime}
+            />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+          ListEmptyComponent={
+            <View className="mt-8 items-center">
+              <Text className="text-sm text-gray-500">
+                Hiện chưa có suất chiếu nào.
+              </Text>
+            </View>
+          }
+        />
+      )}
 
-      {/* <Modal
-        visible={showTrailer}
+      <Modal
+        visible={showTrailer && !!currentTrailer}
         transparent
         animationType="fade"
         onRequestClose={() => setShowTrailer(false)}
       >
         <View className="flex-1 bg-black/90 justify-center items-center px-4">
-          <VideoView
-            source={{ uri: currentTrailer }}
-            nativeControls={true}
-            resizeMode={ResizeMode.CONTAIN}
-            style={{ width: "100%", height: 250, borderRadius: 12 }}
-          />
+          {currentTrailer ? (
+            <View
+              className="w-full"
+              style={{
+                height: 250,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+            >
+              <VideoView
+                player={player}
+                style={{ width: "100%", height: "100%" }}
+                nativeControls
+                contentFit="contain"
+                onFirstFrameRender={() => setVideoLoading(false)}
+              />
+
+              {videoLoading && (
+                <View className="absolute inset-0 items-center justify-center">
+                  <ActivityIndicator size="small" color="#ffffff" />
+                  <Text className="mt-2 text-xs text-white">
+                    Đang tải trailer...
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+
           <Pressable
-            onPress={() => setShowTrailer(false)}
+            onPress={() => {
+              try {
+                player.pause();
+              } catch {}
+              setShowTrailer(false);
+            }}
             className="mt-4 bg-gray-300 px-4 py-2 rounded-lg"
           >
             <Text className="font-semibold text-gray-800">Đóng</Text>
           </Pressable>
         </View>
-      </Modal> */}
+      </Modal>
     </SafeAreaView>
   );
 }

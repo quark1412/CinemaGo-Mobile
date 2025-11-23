@@ -22,7 +22,6 @@ export default function Account() {
   const { toggleTheme, isDark } = useTheme();
   const { user } = useUser();
 
-  // Biometric state
   const [bioSupported, setBioSupported] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [checkingBio, setCheckingBio] = useState(true);
@@ -31,7 +30,6 @@ export default function Account() {
     console.log(user);
   }, [user]);
 
-  // Kiểm tra thiết bị & trạng thái bật/tắt
   useEffect(() => {
     (async () => {
       try {
@@ -45,7 +43,6 @@ export default function Account() {
     })();
   }, []);
 
-  // Bật/tắt sinh trắc học
   const onToggleBiometric = async () => {
     try {
       if (bioEnabled) {
@@ -74,7 +71,6 @@ export default function Account() {
     }
   };
 
-  // Đăng xuất
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove(["user", "accessToken", "refreshToken"]);
 
@@ -85,7 +81,6 @@ export default function Account() {
     <SafeAreaView
       className={`flex-1 ${isDark ? "dark" : "light"} bg-background`}
     >
-      {/* Header */}
       <View className="flex-row items-center justify-between p-4">
         <Text className="text-2xl text-center font-[bold] text-foreground">
           Account
@@ -102,7 +97,6 @@ export default function Account() {
         </TouchableOpacity>
       </View>
 
-      {/* Profile */}
       <View className="items-center gap-2 p-4">
         <Image
           source={{
@@ -117,7 +111,6 @@ export default function Account() {
         </Text>
       </View>
 
-      {/* Actions */}
       <View className="flex-1 p-4">
         <View className="gap-2">
           <TouchableOpacity
@@ -162,7 +155,6 @@ export default function Account() {
             </Text>
           </TouchableOpacity>
 
-          {/* Biometric toggle row */}
           {bioSupported && (
             <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
               <View className="flex-row items-center">
@@ -186,7 +178,6 @@ export default function Account() {
           )}
         </View>
 
-        {/* Sign out */}
         <TouchableOpacity
           className={`flex-row items-center p-4 ${
             isDark
