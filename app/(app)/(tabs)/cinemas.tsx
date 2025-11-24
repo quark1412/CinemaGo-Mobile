@@ -1,12 +1,15 @@
 // app/screens/Cinemas.tsx
 import { useToast } from "@/contexts/toastContext";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { cinemaService } from "@/services/cinema";
+import type { Cinema } from "@/types/cinema";
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { useTheme } from "@/contexts/themeContext";
 import {
   FlatList,
   Image,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -15,88 +18,10 @@ import {
   View,
 } from "react-native";
 
-type Cinema = {
-  id: string;
-  name: string;
-  brandLogo: string;
-  address: string;
-  distanceText?: string;
-  note?: string;
-  city: string;
-  isFav?: boolean;
-  latitude: number;
-  longitude: number;
-};
+const DEFAULT_CINEMA_LOGO =
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop";
 
-const MOCK: Cinema[] = [
-  {
-    id: "cgv-aeon-bt",
-    name: "CGV Aeon Bình Tân",
-    brandLogo:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
-    distanceText: "- km",
-    note: "Bạn vừa chọn rạp này",
-    city: "TP.HCM",
-    isFav: false,
-    latitude: 10.7559,
-    longitude: 106.6168,
-  },
-  {
-    id: "cgv",
-    name: "CGV Aeon Phú thọ",
-    brandLogo:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
-    distanceText: "- km",
-    note: "Bạn vừa chọn rạp này",
-    city: "TP.HCM",
-    isFav: false,
-    latitude: 10.0452,
-    longitude: 105.7469,
-  },
-  {
-    id: "cgv-aeon-p",
-    name: "CGV Aeon HCM",
-    brandLogo:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
-    distanceText: "- km",
-    note: "Bạn vừa chọn rạp này",
-    city: "TP.HCM",
-    isFav: false,
-    latitude: 10.0422,
-    longitude: 105.7169,
-  },
-  {
-    id: "cgv-aeon",
-    name: "CGV Aeon HCM",
-    brandLogo:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
-    distanceText: "- km",
-    note: "Bạn vừa chọn rạp này",
-    city: "Quảng Trị",
-    isFav: false,
-    latitude: 10.02,
-    longitude: 105.742,
-  },
-  {
-    id: "cgv-aeon-t",
-    name: "CGV Aeon HCM",
-    brandLogo:
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop",
-    address: "Tầng 3, Trung tâm thương mại Aeon Mall Bình Tân",
-    distanceText: "- km",
-    note: "Bạn vừa chọn rạp này",
-    city: "Cần Thơ",
-    isFav: false,
-    latitude: 11.0452,
-    longitude: 106.7469,
-  },
-];
-
-const CITIES = [
+const FALLBACK_CITIES = [
   "TP.HCM",
   "Hà Nội",
   "Đà Nẵng",
@@ -109,22 +34,88 @@ const CITIES = [
 export default function Cinemas() {
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("TP.HCM");
-  const [data, setData] = useState(MOCK);
+  const [data, setData] = useState<Cinema[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const { isDark } = useTheme();
   const router = useRouter();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const { showToast } = useToast();
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const fetchCinemas = async () => {
+      try {
+        setLoading(true);
+
+        const allCinemas: Cinema[] = [];
+        let page = 1;
+        const limit = 20;
+        let hasNextPage = true;
+
+        while (hasNextPage && !isCancelled) {
+          const res = await cinemaService.getAllCinemas({
+            page,
+            limit,
+          });
+
+          const data: Cinema[] = res.data ?? [];
+          const pagination = res.pagination;
+
+          console.log("Call page:", pagination);
+          allCinemas.push(...data);
+
+          if (!pagination || !pagination.hasNextPage) {
+            hasNextPage = false;
+          } else {
+            page = (pagination.currentPage ?? page) + 1;
+          }
+        }
+
+        if (!isCancelled) {
+          const list: Cinema[] = allCinemas.map((c: Cinema) => ({
+            ...c,
+            brandLogo: DEFAULT_CINEMA_LOGO,
+          }));
+          setData(list);
+
+          if (
+            allCinemas.length > 0 &&
+            !allCinemas.some((c) => c.city === city)
+          ) {
+            setCity(allCinemas[0].city);
+          }
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Lỗi tải Cinema:", error);
+          showToast("Không tải được danh sách rạp", "error");
+          setData([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchCinemas();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [city, showToast]);
+
+  const cities = useMemo(() => {
+    const unique = Array.from(new Set(data.map((d) => d.city)));
+    return unique.length > 0 ? unique : FALLBACK_CITIES;
+  }, [data]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    console.log(
-      "City đang chọn:",
-      city,
-      "| Danh sách city trong data:",
-      data.map((d) => d.city)
-    );
 
     return data.filter((c) => {
-      // Normalize chuỗi trước khi so sánh để tránh sai khác chữ hoa/thường hoặc khoảng trắng
       const normalize = (s: string) => s.trim().toLowerCase();
       return (
         normalize(c.city) === normalize(city) &&
@@ -135,11 +126,8 @@ export default function Cinemas() {
     });
   }, [data, city, query]);
 
-  const toggleFav = (id: string) =>
-    setData((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, isFav: !c.isFav } : c))
-    );
-
+  const iconColor = isDark ? "#fff" : "#0f172a";
+  const textColor = isDark ? "text-white" : "text-slate-900";
   return (
     <>
       <Stack.Screen
@@ -147,20 +135,37 @@ export default function Cinemas() {
           title: "Danh sách rạp",
           headerShown: true,
           headerBackTitle: "",
-          headerStyle: { backgroundColor: "#fde2e8" },
+          headerStyle: {
+            backgroundColor: isDark ? "#070f20" : "#fde2e8",
+          },
+          headerTitleStyle: {
+            color: isDark ? "#f9fafb" : "#0f172a",
+            fontWeight: "700",
+            fontSize: 16,
+          },
+          headerTintColor: isDark ? "#f9fafb" : "#0f172a",
           headerTitleAlign: "center",
         }}
       />
-      <View className="flex-1 bg-gray-100 px-3">
-        {/* Search */}
-        <View className="flex-row items-center bg-white rounded-xl h-11 mt-2 mb-3 pr-1 shadow-sm">
-          <Ionicons name="search" size={18} style={{ marginHorizontal: 8 }} />
+      <View
+        className={`flex-1  ${isDark ? "dark" : "light"} bg-background px-3`}
+      >
+        <View
+          className={`flex-row items-center  ${isDark ? "dark" : "light"} bg-muted-background rounded-xl h-11 mt-2 mb-3 pr-1 shadow-sm`}
+        >
+          <Ionicons
+            name="search"
+            size={18}
+            style={{ marginHorizontal: 8 }}
+            color={iconColor}
+          />
           <TextInput
             placeholder="Tìm rạp phim..."
+            placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
             value={query}
             onChangeText={setQuery}
             returnKeyType="search"
-            className="flex-1 text-base py-2"
+            className={`flex-1 text-base py-2  ${textColor}`}
           />
           {query.length > 0 ? (
             <Pressable
@@ -173,21 +178,25 @@ export default function Cinemas() {
           ) : null}
         </View>
 
-        {/* Section header */}
         <View className="flex-row items-center justify-between mb-2 px-1">
-          <Text className="text-base font-semibold">
-            Rạp đề xuất ({results.length})
+          <Text
+            className={`text-base  ${isDark ? "dark" : "light"} text-text-muted font-[semibold]`}
+          >
+            {loading ? "Đang tải rạp..." : `Rạp đề xuất (${results.length})`}
           </Text>
           <Pressable
             onPress={() => setShowCityPicker(true)}
-            className="flex-row items-center bg-white px-3 h-7 rounded-full border border-gray-200"
+            className={`flex-row items-center  ${isDark ? "dark" : "light"} bg-muted-background px-3 h-7 rounded-full border border-gray-200`}
           >
-            <Ionicons name="location-outline" size={14} />
-            <Text className="text-xs font-semibold ml-1">{city}</Text>
+            <Ionicons name="location-outline" size={14} color={iconColor} />
+            <Text
+              className={`text-xs font-[semibold] ml-1  ${isDark ? "dark" : "light"} text-text-muted`}
+            >
+              {city}
+            </Text>
           </Pressable>
         </View>
 
-        {/* List */}
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
@@ -199,72 +208,47 @@ export default function Cinemas() {
                 router.push({
                   pathname: "/cinemas/[id]",
                   params: {
-                    id: item.id, // ví dụ "cgv-aeon-bt"
-                    cinemaName: item.name, // "CGV Aeon Bình Tân"
+                    id: item.id,
+                    cinemaName: item.name,
                   },
                 });
               }}
-              className="bg-white rounded-xl p-3 shadow-sm"
+              className={`${isDark ? "dark" : "light"} bg-muted-background rounded-xl p-3 shadow-sm border`}
             >
               <View className="flex-row items-center mb-1.5">
                 <Image
                   source={{ uri: item.brandLogo }}
-                  className="w-7 h-7 mr-2 rounded-md"
+                  className="w-7 h-10 mr-2 rounded-md"
                   resizeMode="contain"
                 />
                 <View className="flex-1">
-                  <Text className="text-[15px] font-extrabold">
+                  <Text
+                    className={`text-[15px] font-[extraBold] ${textColor} `}
+                  >
                     {item.name}
                   </Text>
-                  <Text className="text-xs text-gray-500 mt-0.5">
-                    {item.note ? `${item.note}  ` : ""}
-                    {item.distanceText ?? ""}
+                  <Text className="text-sm text-gray-500 mt-0.5">
+                    {item.address ? `${item.address}  ` : ""}
                   </Text>
                 </View>
-
-                <Pressable
-                  onPress={() => toggleFav(item.id)}
-                  hitSlop={8}
-                  className="mr-1.5"
-                >
-                  <Ionicons
-                    name={item.isFav ? "heart" : "heart-outline"}
-                    size={22}
-                  />
-                </Pressable>
-                <Ionicons name="chevron-forward" size={22} />
               </View>
 
-              <Text numberOfLines={2} className="text-[13px] text-gray-700">
+              {/* <Text numberOfLines={2} className="text-[13px] text-gray-700">
                 {item.address}
-              </Text>
-
-              <Pressable
-                onPress={() => {
-                  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`;
-                  Linking.openURL(url).catch(() =>
-                    showToast(
-                      "Không thể mở Google Maps trên thiết bị của bạn",
-                      "warning"
-                    )
-                  );
-                  // const url = `https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}&travelmode=driving`;
-                  // Linking.openURL(url).catch(() =>
-                  //   alert("Không thể mở Google Maps trên thiết bị của bạn")
-                  // );
-                }}
-                className="flex-row items-center mt-2"
-              >
-                <MaterialIcons name="directions" size={16} />
-                <Text className="text-[13px] underline font-semibold ml-1">
-                  Tìm đường
-                </Text>
-              </Pressable>
+              </Text> */}
             </Pressable>
           )}
+          ListEmptyComponent={
+            !loading ? (
+              <View className="mt-6 items-center">
+                <Text className="text-sm text-gray-500">
+                  Không tìm thấy rạp phù hợp
+                </Text>
+              </View>
+            ) : null
+          }
         />
 
-        {/* Modal chọn thành phố */}
         <Modal
           visible={showCityPicker}
           animationType="slide"
@@ -277,12 +261,11 @@ export default function Cinemas() {
                 Chọn thành phố
               </Text>
 
-              {/* ✅ Bọc danh sách trong ScrollView để có thể cuộn */}
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 12 }}
               >
-                {CITIES.map((c) => (
+                {cities.map((c) => (
                   <Pressable
                     key={c}
                     onPress={() => {
