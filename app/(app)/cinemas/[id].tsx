@@ -201,6 +201,10 @@ export default function Showtimes() {
                 nativeControls
                 contentFit="contain"
                 onFirstFrameRender={() => setVideoLoading(false)}
+                // onError={(error) => {
+                //   console.log("Lỗi play video:", error);
+                //   setVideoLoading(false); // Tắt loading để user biết mà đóng
+                // }}
               />
 
               {videoLoading && (

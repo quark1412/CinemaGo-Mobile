@@ -1,10 +1,11 @@
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
-
 import { useTheme } from "@/contexts/themeContext";
 import type { MovieWithLabels } from "@/hook/useCinemaShowtimes";
 import type { Showtime } from "@/types/showtime";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Image, Pressable, Text, View } from "react-native";
 
 type Movie = MovieWithLabels;
 
@@ -19,45 +20,73 @@ const formatDuration = (minutes?: number) => {
   return `${minutes} phút`;
 };
 
-const formatTimeHHmm = (iso: string) => {
-  if (!iso) return "";
-  const m = iso.match(/T(\d{2}:\d{2})/);
-  if (m) return m[1];
+const VN_TZ = "Asia/Ho_Chi_Minh";
+
+const getVietnamDateKeyAndLabel = (iso?: string | null) => {
+  if (!iso) return null;
 
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const hh = d.getHours().toString().padStart(2, "0");
-  const mm = d.getMinutes().toString().padStart(2, "0");
-  return `${hh}:${mm}`;
+  if (isNaN(d.getTime())) return null;
+
+  const dateKey = d.toLocaleDateString("en-CA", {
+    timeZone: VN_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const weekday = d.toLocaleDateString("vi-VN", {
+    timeZone: VN_TZ,
+    weekday: "long",
+  });
+  const datePart = d.toLocaleDateString("vi-VN", {
+    timeZone: VN_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  const dateLabel = `${weekday}, ${datePart}`;
+
+  return { dateKey, dateLabel };
 };
 
-const formatShowDate = (iso: string) => {
+const formatVNTime = (iso?: string | null) => {
   if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("vi-VN", {
+    timeZone: VN_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  }); // ví dụ: "19:30"
+};
 
-  const datePart = iso.slice(0, 10);
-  const [yearStr, monthStr, dayStr] = datePart.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-  if (!year || !month || !day) return "";
+const isYoutubeUrl = (url: string) => {
+  const lower = url.toLowerCase();
+  return lower.includes("youtube.com") || lower.includes("youtu.be");
+};
 
-  const d = new Date(year, month - 1, day);
+const getYoutubeId = (url: string) => {
+  try {
+    const u = new URL(url);
 
-  const weekdays = [
-    "Chủ Nhật",
-    "Thứ Hai",
-    "Thứ Ba",
-    "Thứ Tư",
-    "Thứ Năm",
-    "Thứ Sáu",
-    "Thứ Bảy",
-  ];
-  const w = weekdays[d.getDay()];
-  const dd = day.toString().padStart(2, "0");
-  const mm = month.toString().padStart(2, "0");
-  const yyyy = year;
+    if (u.hostname.includes("youtube.com")) {
+      if (u.pathname.startsWith("/embed/")) {
+        return u.pathname.split("/embed/")[1];
+      }
 
-  return `${w}, ${dd}/${mm}/${yyyy}`;
+      const v = u.searchParams.get("v");
+      if (v) return v;
+    }
+
+    if (u.hostname.includes("youtu.be")) {
+      return u.pathname.replace("/", "");
+    }
+  } catch (e) {
+    console.log("parse youtube url error", e);
+  }
+  return null;
 };
 
 const buildOptimizedTrailerUrl = (rawUrl?: string | null) => {
@@ -71,7 +100,7 @@ const buildOptimizedTrailerUrl = (rawUrl?: string | null) => {
   const base = match[1];
   const rest = match[2];
 
-  const transformations = "f_auto,q_auto:eco,vc_auto,w_720,so_0,eo_60";
+  const transformations = "c_limit,w_480,f_auto,q_auto:eco,so_0,d_30";
 
   return `${base}${transformations}/${rest}`;
 };
@@ -82,7 +111,7 @@ export default function MovieCard({
   onPressShowtime,
 }: Props) {
   const m = movie;
-  const genresText = m.genres?.map((g) => g.name).join(", ");
+  console.log(m);
 
   type DateSection = {
     dateKey: string;
@@ -97,16 +126,19 @@ export default function MovieCard({
 
   (m.labels ?? []).forEach((group) => {
     (group.showtimes ?? []).forEach((st) => {
-      const iso = st.startTime as string;
+      const iso = st.startTime as string | undefined;
       if (!iso) return;
 
-      const dateKey = iso.slice(0, 10);
+      const info = getVietnamDateKeyAndLabel(iso);
+      if (!info) return;
+      const { dateKey, dateLabel } = info;
+
       let dateSection = dateMap.get(dateKey);
 
       if (!dateSection) {
         dateSection = {
           dateKey,
-          dateLabel: formatShowDate(iso),
+          dateLabel,
           formats: [],
         };
         dateMap.set(dateKey, dateSection);
@@ -133,12 +165,16 @@ export default function MovieCard({
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>(
     {}
   );
+  const navigation = useNavigation<any>();
 
   const toggleDesc = () => setDescExpanded((prev) => !prev);
 
   const { isDark } = useTheme();
   const textColor = isDark ? "text-white" : "text-slate-900";
   const iconColor = isDark ? "#fff" : "#0f172a";
+
+  const genreBgClass = isDark ? "bg-slate-700" : "bg-slate-300";
+  const genreTextClass = isDark ? "text-slate-100" : "text-slate-800";
   return (
     <View
       className={`${isDark ? "dark" : "light"} bg-muted-background rounded-2xl p-3 mb-4 shadow-sm`}
@@ -166,11 +202,35 @@ export default function MovieCard({
             </Pressable>
           </View>
 
-          <Text className={`text-[11px] text-gray-600 mb-1 ${textColor}`}>
-            {genresText}
-            {genresText ? " · " : ""}
-            {formatDuration(m.duration)}
-          </Text>
+          <View className="flex-col items-start mb-2 mt-1">
+            {!!m.genres?.length && (
+              <View className="flex-row items-start  mr-3">
+                <Ionicons name="pricetag-outline" size={12} color={iconColor} />
+
+                <View className="flex-row flex-wrap ml-1 gap-1 flex-1">
+                  {m.genres.map((g) => (
+                    <View
+                      key={g.id ?? g.name}
+                      className={`px-2 py-0.5 rounded-full ${genreBgClass}`}
+                    >
+                      <Text className={`text-xs ${genreTextClass}`}>
+                        {g.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {m.duration ? (
+              <View className="flex-row items-center mt-1">
+                <Ionicons name="time-outline" size={12} color={iconColor} />
+                <Text className={`ml-1 text-xs ${textColor}`}>
+                  {formatDuration(m.duration)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           {!!m.description && (
             <View className="mb-1">
@@ -201,12 +261,38 @@ export default function MovieCard({
 
           <Pressable
             onPress={() => {
-              if (!m.trailerUrl || !onPressTrailer) return;
+              if (!m.trailerUrl) return;
+
+              const url = m.trailerUrl.trim();
+              console.log(">>> Trailer pressed:", url);
+
+              if (isYoutubeUrl(url)) {
+                const id = getYoutubeId(url);
+                console.log(">>> youtube id:", id);
+
+                if (!id) return;
+
+                router.push({
+                  pathname: "/showtimes/trailer",
+                  params: {
+                    youtubeId: id,
+                    title: m.title ?? "",
+                  },
+                });
+                console.log("huhu");
+                return;
+              }
+
+              if (!onPressTrailer) return;
+
+              console.log("cloudinary");
+
               const optimized = buildOptimizedTrailerUrl(m.trailerUrl);
               if (!optimized) return;
+
               onPressTrailer(optimized);
             }}
-            disabled={!m.trailerUrl || !onPressTrailer}
+            disabled={!m.trailerUrl}
             className="flex-row items-center mt-1"
           >
             <MaterialIcons
@@ -274,7 +360,7 @@ export default function MovieCard({
                             <Text
                               className={`text-[13px] font-[semibold] ${textColor}`}
                             >
-                              {formatTimeHHmm(st.startTime as string)}
+                              {formatVNTime(st.startTime as string)}
                             </Text>
                           </Pressable>
                         ))}

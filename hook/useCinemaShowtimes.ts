@@ -28,7 +28,6 @@ export function useCinemaShowtimes(cinemaId?: string) {
     const fetchCinema = async () => {
       try {
         setLoadingCinema(true);
-
         const c: Cinema = await cinemaService.getCinemaById(cinemaId);
         if (!cancelled) setCinema(c);
       } catch (err) {
@@ -39,7 +38,6 @@ export function useCinemaShowtimes(cinemaId?: string) {
     };
 
     fetchCinema();
-
     return () => {
       cancelled = true;
     };
@@ -59,8 +57,10 @@ export function useCinemaShowtimes(cinemaId?: string) {
         const limit = 20;
         let hasNextPage = true;
 
-        const nowIso = new Date().toISOString();
-        console.log(nowIso);
+        const now = new Date();
+        const nowIso = now.toISOString();
+
+        console.log("Time sent to API (UTC):", nowIso);
 
         while (hasNextPage && !cancelled) {
           const res = await showTimeService.getShowTimes({
@@ -84,13 +84,22 @@ export function useCinemaShowtimes(cinemaId?: string) {
 
         if (cancelled) return;
 
-        const now = new Date();
+        const nowTimestamp = now.getTime();
+
         const futureShowtimes = allShowtimes.filter((st) => {
-          const iso = st.startTime as string | undefined;
-          if (!iso) return false;
-          const d = new Date(iso);
-          if (isNaN(d.getTime())) return false;
-          return d.getTime() >= now.getTime();
+          if (!st.startTime) return false;
+
+          const showDate = new Date(st.startTime);
+
+          if (isNaN(showDate.getTime())) return false;
+
+          return showDate.getTime() >= nowTimestamp;
+        });
+
+        futureShowtimes.sort((a, b) => {
+          return (
+            new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime()
+          );
         });
 
         if (futureShowtimes.length === 0) {
@@ -100,26 +109,21 @@ export function useCinemaShowtimes(cinemaId?: string) {
 
         const movieIdSet = new Set(
           futureShowtimes
-            .map((st: Showtime) => st.movieId)
-            .filter((id: string | undefined) => !!id)
+            .map((st) => st.movieId)
+            .filter((id): id is string => !!id)
         );
-        const movieIds = Array.from(movieIdSet) as string[];
-
-        if (movieIds.length === 0) {
-          setMovies([]);
-          return;
-        }
+        const movieIds = Array.from(movieIdSet);
 
         const moviePromises = movieIds.map(async (movieId) => {
           try {
             const movie: ApiMovie = await movieService.getMovieById(movieId);
 
-            const myShowtimes = allShowtimes.filter(
-              (st: Showtime) => st.movieId === movieId
+            const myShowtimes = futureShowtimes.filter(
+              (st) => st.movieId === movieId
             );
+
             if (myShowtimes.length === 0) return null;
 
-            // group theo format
             const labelMap = new Map<string, Showtime[]>();
 
             myShowtimes.forEach((st) => {
@@ -133,29 +137,18 @@ export function useCinemaShowtimes(cinemaId?: string) {
               labelMap.entries()
             ).map(([name, showtimes]) => ({ name, showtimes }));
 
-            const movieWithShowtimes: MovieWithLabels = {
-              ...movie,
-              labels,
-            };
-
-            return movieWithShowtimes;
+            return { ...movie, labels };
           } catch (err) {
-            console.error("Lỗi getMovieById:", err);
+            console.error(`Lỗi getMovieById (${movieId}):`, err);
             return null;
           }
         });
 
-        const moviesWithShowtimes = (await Promise.all(
-          moviePromises
-        )) as (MovieWithLabels | null)[];
-
-        const finalMovies = moviesWithShowtimes.filter(
-          (m): m is MovieWithLabels =>
-            !!m &&
-            (m.labels ?? []).some((g) => g.showtimes && g.showtimes.length > 0)
+        const moviesWithShowtimes = (await Promise.all(moviePromises)).filter(
+          (m): m is MovieWithLabels => !!m
         );
 
-        if (!cancelled) setMovies(finalMovies);
+        if (!cancelled) setMovies(moviesWithShowtimes);
       } catch (err) {
         console.error("Lỗi fetch showtimes + movies:", err);
         if (!cancelled) setMovies([]);
@@ -171,10 +164,5 @@ export function useCinemaShowtimes(cinemaId?: string) {
     };
   }, [cinemaId]);
 
-  return {
-    cinema,
-    movies,
-    loadingCinema,
-    loadingMovies,
-  };
+  return { cinema, movies, loadingCinema, loadingMovies };
 }
