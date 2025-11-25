@@ -1,13 +1,114 @@
+import TrailerModal from "@/components/trailer-modal";
+import { useTheme } from "@/contexts/themeContext";
+import { movieService } from "@/services/movie";
+import { reviewService } from "@/services/review";
+import type { Movie } from "@/types/movie";
+import type { Review, ReviewOverview } from "@/types/review";
+import { handleMovieTrailerPress } from "@/utils/trailerHelper";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { mockMovies } from "./mockdata";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ReviewItem } from "./ReviewItem";
+
+const formatDate = (value?: string | Date | null) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
 
 export default function MovieDetail() {
   const { id } = useLocalSearchParams();
-  const movie = mockMovies;
+  const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
   const router = useRouter();
+  const [movie, setMovie] = useState<Movie | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [reviewOverview, setReviewOverview] = useState<ReviewOverview | null>(
+    null
+  );
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  const [showTrailerModal, setShowTrailerModal] = useState(false);
+  const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await movieService.getMovieById(id as string);
+        if (!cancelled) setMovie(data);
+      } catch (e) {
+        console.error("getMovieById error:", e);
+        if (!cancelled) {
+          setError("Không tải được thông tin phim.");
+          setMovie(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!movie?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingReviews(true);
+
+        const [overviewRes, reviewsRes] = await Promise.all([
+          reviewService.getReviewOverview(movie.id),
+          reviewService.getReviews({
+            movieId: movie.id,
+            page: 1,
+            limit: 10,
+          }),
+        ]);
+
+        if (cancelled) return;
+        setReviewOverview(overviewRes);
+        setReviews(reviewsRes.data ?? []);
+      } catch (e) {
+        console.error("getReviews error:", e);
+        if (!cancelled) {
+          setReviewOverview(null);
+          setReviews([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingReviews(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [movie?.id]);
 
   if (!movie) {
     return (
@@ -17,103 +118,249 @@ export default function MovieDetail() {
     );
   }
 
+  const genreBgClass = isDark ? "bg-slate-700" : "bg-slate-300";
+  const genreTextClass = isDark ? "text-slate-100" : "text-slate-800";
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const iconColor = isDark ? "#fff" : "#0f172a";
+
+  const onPressTrailer = () => {
+    if (!movie.trailerUrl) return;
+
+    handleMovieTrailerPress(
+      { title: movie.title, trailerUrl: movie.trailerUrl },
+      (optimizedUrl) => {
+        setTrailerUrl(optimizedUrl);
+        setShowTrailerModal(true);
+      }
+    );
+  };
+
+  const avgRating =
+    (typeof reviewOverview?.averageRating === "number"
+      ? reviewOverview.averageRating
+      : Number(reviewOverview?.averageRating)) ||
+    (movie as any).rating ||
+    0;
+
+  const totalReviews =
+    reviewOverview?.totalReviews || (movie as any).reviews || 0;
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          // Tiêu đề (có thể cắt bớt cho gọn)
-          title: movie?.title ?? "Chi tiết phim",
-          headerTitleAlign: "center", // iOS center, Android cũng sẽ center
-          // Nút back tuỳ biến (mặc định có sẵn nếu không muốn custom thì bỏ block này)
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ paddingHorizontal: 8 }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chevron-back" size={24} />
-            </TouchableOpacity>
-          ),
+      <View
+        style={{
+          paddingTop: insets.top,
+          backgroundColor: isDark ? "#070f20" : "#fde2e8",
         }}
-      />
-
-      <ScrollView className="flex-1 bg-white mb-5">
-        <Image
-          source={{ uri: movie.poster }}
+      >
+        <View
           style={{
-            width: "100%",
-            height: 250,
+            height: 52,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 8,
           }}
-        />
+        >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ position: "absolute", left: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={isDark ? "#f9fafb" : "#0f172a"}
+            />
+          </TouchableOpacity>
 
-        <View className="p-4">
-          {/* Title */}
-          <Text className="text-2xl font-bold">{movie.title}</Text>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 16,
+              fontWeight: "700",
+              color: isDark ? "#f9fafb" : "#0f172a",
+            }}
+          >
+            {movie?.title ?? "Chi tiết phim"}
+          </Text>
+        </View>
+      </View>
 
-          {/* Info tags */}
-          <View className="flex-row items-center mt-2">
-            <Text className="bg-yellow-200 text-yellow-600 px-2 py-[2px] rounded mr-2">
-              {movie.age}
-            </Text>
-            <Text className="text-gray-600">{movie.description}</Text>
-          </View>
+      {loading && !movie ? (
+        <View className="flex-1 items-center justify-center bg-white">
+          <ActivityIndicator />
+          <Text className="mt-2 text-gray-500 text-sm">
+            Đang tải thông tin phim...
+          </Text>
+        </View>
+      ) : error || !movie ? (
+        <View className="flex-1 items-center justify-center bg-white">
+          <Text className="text-sm text-gray-600">
+            {error || "Không tìm thấy dữ liệu phim."}
+          </Text>
+        </View>
+      ) : (
+        <View className="flex-1 bg-white">
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{
+              paddingBottom: 80 + insets.bottom,
+            }}
+          >
+            <View className="p-4">
+              <View className="flex-row">
+                <View className="mr-4">
+                  <View className="relative">
+                    <Image
+                      source={{ uri: movie.thumbnail }}
+                      style={{ width: 140, height: 220, borderRadius: 12 }}
+                    />
+                  </View>
+                </View>
 
-          {/* 3 columns */}
-          <View className="flex-row justify-between mt-5">
-            <View className="items-center">
-              <Text className="text-[12px] text-gray-500">Ngày khởi chiếu</Text>
-              <Text className="font-semibold">{movie.releaseDate}</Text>
-            </View>
-
-            <View className="items-center">
-              <Text className="text-[12px] text-gray-500">Thời lượng</Text>
-              <Text className="font-semibold">{movie.duration}</Text>
-            </View>
-
-            <View className="items-center">
-              <Text className="text-[12px] text-gray-500">Ngôn ngữ</Text>
-              <Text className="font-semibold">{movie.language}</Text>
-            </View>
-          </View>
-
-          {/* Rating */}
-          <View className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
-            <Text className="text-xl font-bold">⭐ {movie.rating}/10</Text>
-            <Text className="text-gray-500">({movie.reviews} đánh giá)</Text>
-          </View>
-
-          {/* Content */}
-          <View className="mt-6">
-            <Text className="text-lg font-bold mb-1">Nội dung phim</Text>
-            <Text className="text-gray-700 leading-5">{movie.content}</Text>
-          </View>
-
-          {movie.comments?.length > 0 && (
-            <View className="mt-8">
-              <View className="flex-row justify-between items-center mb-3">
-                <Text className="text-lg font-bold">Đánh giá</Text>
-                <TouchableOpacity>
-                  <Text className="text-pink-600 font-semibold">
-                    Viết đánh giá
+                <View className="flex-1">
+                  <Text className="text-lg font-[800]" numberOfLines={2}>
+                    {movie.title}
                   </Text>
-                </TouchableOpacity>
+
+                  <View className="flex-row items-center flex-wrap mt-1">
+                    {!!movie.genres &&
+                      movie.genres.map((g) => (
+                        <View
+                          key={g.id ?? g.name}
+                          className={`px-2 py-0.5 rounded-full ${genreBgClass} mr-1 mb-1`}
+                        >
+                          <Text className={`text-[10px] ${genreTextClass}`}>
+                            {g.name}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
+
+                  {!!movie.description && (
+                    <Text
+                      className="mt-2 text-[11px] text-gray-600"
+                      numberOfLines={2}
+                    >
+                      {movie.description}
+                    </Text>
+                  )}
+
+                  <View className="flex-row mt-3">
+                    <TouchableOpacity
+                      className="flex-row flex-1 items-center justify-center border border-pink-500 rounded-full py-1.5"
+                      onPress={onPressTrailer}
+                      disabled={!movie.trailerUrl}
+                    >
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={16}
+                        color="#ec4899"
+                      />
+                      <Text className="ml-1 text-[12px] font-semibold text-pink-600">
+                        Xem Trailer
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Ngày & thời lượng */}
+                  <View className="mt-3 pt-2 border-t border-gray-100">
+                    <View className="flex-row items-center mb-1.5">
+                      <Ionicons
+                        name="calendar-outline"
+                        size={14}
+                        color="#6b7280"
+                      />
+                      <Text className="ml-1 text-[12px] font-semibold text-gray-800">
+                        {formatDate(movie.releaseDate)}
+                      </Text>
+                    </View>
+
+                    <View className="flex-row items-center">
+                      <Ionicons name="time-outline" size={14} color="#6b7280" />
+                      <Text className="ml-1 text-[12px] font-semibold text-gray-800">
+                        {movie.duration} phút
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </View>
 
-              {movie.comments.map((c, i) => (
-                <ReviewItem key={i} data={c} />
-              ))}
-            </View>
-          )}
+              <View className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200 flex-row items-center justify-between">
+                <View className="flex-row items-baseline">
+                  <Text className="text-xl font-bold">
+                    ⭐ {avgRating.toFixed ? avgRating.toFixed(1) : avgRating}
+                    /5
+                  </Text>
+                  <Text className="text-gray-500 ml-2 text-sm">
+                    ({totalReviews} đánh giá)
+                  </Text>
+                </View>
+                {loadingReviews && (
+                  <ActivityIndicator size="small" color="#9CA3AF" />
+                )}
+              </View>
 
-          {/* Button */}
-          <TouchableOpacity className="bg-pink-600 rounded-xl py-3 mt-8 mb-10 ">
-            <Text className="text-center text-white font-semibold text-[16px]">
-              Mua vé
-            </Text>
-          </TouchableOpacity>
+              <View className="mt-6">
+                <Text className="text-lg font-bold mb-1">Nội dung phim</Text>
+                <Text className="text-gray-700 leading-5">
+                  {movie.description}
+                </Text>
+              </View>
+
+              {reviews.length > 0 && (
+                <View className="mt-8">
+                  <View className="flex-row justify-between items-center mb-3">
+                    <Text className="text-lg font-bold">Đánh giá</Text>
+                    <TouchableOpacity>
+                      <Text className="text-pink-600 font-semibold">
+                        Viết đánh giá
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {reviews.map((r) => (
+                    <ReviewItem key={r.id} data={r} />
+                  ))}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              paddingHorizontal: 16,
+              paddingBottom: insets.bottom + 8,
+              paddingTop: 8,
+              backgroundColor: "white",
+              borderTopWidth: 1,
+              borderColor: "#e5e7eb",
+            }}
+          >
+            <TouchableOpacity
+              className="bg-pink-600 rounded-xl py-3"
+              onPress={() => {
+                // TODO: navigate to booking
+              }}
+            >
+              <Text className="text-center text-white font-semibold text-[16px]">
+                Mua vé
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
+      )}
+
+      <TrailerModal
+        visible={showTrailerModal && !!trailerUrl}
+        trailerUrl={trailerUrl}
+        onClose={() => setShowTrailerModal(false)}
+      />
     </>
   );
 }

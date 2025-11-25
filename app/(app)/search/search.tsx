@@ -263,7 +263,7 @@ export default function SearchScreen() {
                       Điểm đánh giá
                     </Text>
                     <Text className="text-orange-500 font-bold">
-                      {minRating}/10{" "}
+                      {minRating}/5{" "}
                       <Ionicons name="star" size={14} color="#FFD700" />
                     </Text>
                   </View>
@@ -272,7 +272,7 @@ export default function SearchScreen() {
                     showsHorizontalScrollIndicator={false}
                     className="mb-4"
                   >
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+                    {[0, 1, 2, 3, 4, 5].map((star) => (
                       <TouchableOpacity
                         key={star}
                         onPress={() => setMinRating(star)}

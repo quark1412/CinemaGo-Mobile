@@ -37,6 +37,7 @@ export const authService = {
     } as any);
 
     const { accessToken, refreshToken: newRefreshToken } = res.data;
+    console.log(accessToken);
 
     await AsyncStorage.setItem("accessToken", accessToken);
     await AsyncStorage.setItem("refreshToken", newRefreshToken);
