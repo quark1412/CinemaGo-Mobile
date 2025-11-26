@@ -175,7 +175,7 @@ export default function Home() {
     const thumbnail = (item as any).poster ?? (item as any).thumbnail;
     const genreText = Array.isArray((item as any).genres)
       ? (item as any).genres.map((g: any) => g.name).join(", ")
-      : ((item as any).genre ?? "");
+      : (item as any).genre ?? "";
     return (
       <TouchableOpacity
         onPress={() =>
@@ -246,7 +246,7 @@ export default function Home() {
     const thumbnail = (item as any).poster ?? (item as any).thumbnail;
     const genreText = Array.isArray((item as any).genres)
       ? (item as any).genres.map((g: any) => g.name).join(", ")
-      : ((item as any).genre ?? "");
+      : (item as any).genre ?? "";
 
     return (
       <TouchableOpacity
@@ -335,7 +335,9 @@ export default function Home() {
         <View>
           <View className="px-4 pt-2 pb-1">
             <Text
-              className={`text-[22px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+              className={`text-[22px] font-[bold]  ${
+                isDark ? "dark" : "light"
+              } text-text-muted`}
             >
               Mua vé xem phim
             </Text>
@@ -345,7 +347,9 @@ export default function Home() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={goSearch}
-              className={`flex-row items-center  ${isDark ? "dark" : "light"} bg-muted-background rounded-xl px-3 py-2`}
+              className={`flex-row items-center  ${
+                isDark ? "dark" : "light"
+              } bg-muted-background rounded-xl px-3 py-2`}
             >
               <Ionicons name="search-outline" size={20} color={iconColor} />
               <TextInput
@@ -360,7 +364,9 @@ export default function Home() {
 
           <View className="px-4 mb-2">
             <Text
-              className={`text-[20px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+              className={`text-[20px] font-[bold]  ${
+                isDark ? "dark" : "light"
+              } text-text-muted`}
             >
               Phim nổi bật
             </Text>
@@ -391,7 +397,9 @@ export default function Home() {
 
           <View className="px-4 mt-5 mb-3 flex-row justify-between items-center">
             <Text
-              className={`text-[20px] font-[bold]  ${isDark ? "dark" : "light"} text-text-muted`}
+              className={`text-[20px] font-[bold]  ${
+                isDark ? "dark" : "light"
+              } text-text-muted`}
             >
               Phim hay đang chiếu
             </Text>

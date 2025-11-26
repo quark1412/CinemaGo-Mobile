@@ -1,4 +1,5 @@
 // app/(app)/movies/ReviewItem.tsx
+import { useTheme } from "@/contexts/themeContext";
 import type { Review } from "@/types/review";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -37,6 +38,8 @@ const formatReviewDate = (value?: string | null) => {
 
 export function ReviewItem({ data }: Props) {
   const router = useRouter();
+  const { isDark } = useTheme();
+
   const [expanded, setExpanded] = useState(false);
 
   const rawText = data.content ?? "";
@@ -63,11 +66,14 @@ export function ReviewItem({ data }: Props) {
     });
   };
 
+  const textColor = isDark ? "text-white" : "text-slate-900";
+  const iconColor = isDark ? "#fff" : "#0f172a";
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={handleGoToReply}
-      className="bg-white rounded-xl p-4 mb-4 border border-gray-200 relative"
+      className={`bg-white rounded-xl p-4 mb-4 border border-gray-200 relative ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
     >
       {/* header */}
       <View className="flex-row justify-between items-center">
@@ -78,9 +84,15 @@ export function ReviewItem({ data }: Props) {
             style={{ width: 36, height: 36, borderRadius: 18, marginRight: 8 }}
           />
           <View>
-            <Text className="font-semibold text-[15px]">{userName}</Text>
+            <Text className={`font-[semibold] text-[15px] ${textColor}`}>
+              {userName}
+            </Text>
             {!!createdAtText && (
-              <Text className="text-[12px] text-gray-500">{createdAtText}</Text>
+              <Text
+                className={`text-[12px] ${isDark ? "text-gray-300" : "text-gray-800"}`}
+              >
+                {createdAtText}
+              </Text>
             )}
           </View>
         </View>
@@ -94,20 +106,25 @@ export function ReviewItem({ data }: Props) {
       </View>
 
       {/* text */}
-      <Text className="text-[14px] text-gray-700 mt-3 leading-5">
-        {content}
+      <View className="mt-3">
+        <Text
+          className={`text-[14px] leading-5 ${isDark ? "text-gray-300" : "text-gray-800"}`}
+        >
+          {content}
+        </Text>
+
         {canToggle && (
           <Text
-            className="text-pink-600 font-medium"
+            className="text-pink-600 font-medium text-[13px] mt-1"
             onPress={(e) => {
               e.stopPropagation(); // tránh bấm "xem thêm" lại navigate
               setExpanded((p) => !p);
             }}
           >
-            {expanded ? "  thu gọn" : "  xem thêm"}
+            {expanded ? "Thu gọn" : "Xem thêm"}
           </Text>
         )}
-      </Text>
+      </View>
 
       <TouchableOpacity
         onPress={(e) => {

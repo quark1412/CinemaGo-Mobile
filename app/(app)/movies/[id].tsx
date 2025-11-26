@@ -1,3 +1,4 @@
+import { ReviewItem } from "@/components/review-item";
 import TrailerModal from "@/components/trailer-modal";
 import { useTheme } from "@/contexts/themeContext";
 import { movieService } from "@/services/movie";
@@ -6,8 +7,8 @@ import type { Movie } from "@/types/movie";
 import type { Review, ReviewOverview } from "@/types/review";
 import { handleMovieTrailerPress } from "@/utils/trailerHelper";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -17,7 +18,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ReviewItem } from "./ReviewItem";
 
 const formatDate = (value?: string | Date | null) => {
   if (!value) return "";
@@ -31,6 +31,8 @@ const formatDate = (value?: string | Date | null) => {
 
 export default function MovieDetail() {
   const { id } = useLocalSearchParams();
+  console.log(id);
+
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const router = useRouter();
@@ -74,41 +76,44 @@ export default function MovieDetail() {
     };
   }, [id]);
 
-  useEffect(() => {
-    if (!movie?.id) return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!movie?.id) return;
 
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoadingReviews(true);
+      let cancelled = false;
 
-        const [overviewRes, reviewsRes] = await Promise.all([
-          reviewService.getReviewOverview(movie.id),
-          reviewService.getReviews({
-            movieId: movie.id,
-            page: 1,
-            limit: 10,
-          }),
-        ]);
+      (async () => {
+        try {
+          // if (reviews.length === 0) setLoadingReviews(true);
+          setLoadingReviews(true);
+          const [overviewRes, reviewsRes] = await Promise.all([
+            reviewService.getReviewOverview(movie.id),
+            reviewService.getReviews({
+              movieId: movie.id,
+              page: 1,
+              limit: 5,
+            }),
+          ]);
 
-        if (cancelled) return;
-        setReviewOverview(overviewRes);
-        setReviews(reviewsRes.data ?? []);
-      } catch (e) {
-        console.error("getReviews error:", e);
-        if (!cancelled) {
-          setReviewOverview(null);
-          setReviews([]);
+          if (cancelled) return;
+          setReviewOverview(overviewRes);
+          setReviews(reviewsRes.data ?? []);
+        } catch (e) {
+          console.error("getReviews error:", e);
+          if (!cancelled) {
+            setReviewOverview(null);
+            setReviews([]);
+          }
+        } finally {
+          if (!cancelled) setLoadingReviews(false);
         }
-      } finally {
-        if (!cancelled) setLoadingReviews(false);
-      }
-    })();
+      })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [movie?.id]);
+      return () => {
+        cancelled = true;
+      };
+    }, [movie?.id])
+  );
 
   if (!movie) {
     return (
@@ -188,20 +193,26 @@ export default function MovieDetail() {
       </View>
 
       {loading && !movie ? (
-        <View className="flex-1 items-center justify-center bg-white">
+        <View
+          className={`flex-1 items-center justify-center  ${isDark ? "dark" : "light"} bg-muted-background`}
+        >
           <ActivityIndicator />
           <Text className="mt-2 text-gray-500 text-sm">
             Đang tải thông tin phim...
           </Text>
         </View>
       ) : error || !movie ? (
-        <View className="flex-1 items-center justify-center bg-white">
+        <View
+          className={`flex-1 items-center justify-center  ${isDark ? "dark" : "light"} bg-muted-background`}
+        >
           <Text className="text-sm text-gray-600">
             {error || "Không tìm thấy dữ liệu phim."}
           </Text>
         </View>
       ) : (
-        <View className="flex-1 bg-white">
+        <View
+          className={`flex-1  ${isDark ? "dark" : "light"} bg-muted-background`}
+        >
           <ScrollView
             className="flex-1"
             contentContainerStyle={{
@@ -220,7 +231,10 @@ export default function MovieDetail() {
                 </View>
 
                 <View className="flex-1">
-                  <Text className="text-lg font-[800]" numberOfLines={2}>
+                  <Text
+                    className={`text-lg font-[extraBold] ${textColor}`}
+                    numberOfLines={2}
+                  >
                     {movie.title}
                   </Text>
 
@@ -240,7 +254,7 @@ export default function MovieDetail() {
 
                   {!!movie.description && (
                     <Text
-                      className="mt-2 text-[11px] text-gray-600"
+                      className={`mt-2 text-[11px] text-gray-600 ${textColor}`}
                       numberOfLines={2}
                     >
                       {movie.description}
@@ -264,7 +278,6 @@ export default function MovieDetail() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Ngày & thời lượng */}
                   <View className="mt-3 pt-2 border-t border-gray-100">
                     <View className="flex-row items-center mb-1.5">
                       <Ionicons
@@ -272,14 +285,18 @@ export default function MovieDetail() {
                         size={14}
                         color="#6b7280"
                       />
-                      <Text className="ml-1 text-[12px] font-semibold text-gray-800">
+                      <Text
+                        className={`ml-1 text-[12px] font-semibold  ${isDark ? "text-gray-300" : "text-gray-800"}`}
+                      >
                         {formatDate(movie.releaseDate)}
                       </Text>
                     </View>
 
                     <View className="flex-row items-center">
                       <Ionicons name="time-outline" size={14} color="#6b7280" />
-                      <Text className="ml-1 text-[12px] font-semibold text-gray-800">
+                      <Text
+                        className={`ml-1 text-[12px] font-semibold ${isDark ? "text-gray-300" : "text-gray-800"}`}
+                      >
                         {movie.duration} phút
                       </Text>
                     </View>
@@ -287,13 +304,17 @@ export default function MovieDetail() {
                 </View>
               </View>
 
-              <View className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200 flex-row items-center justify-between">
+              <View
+                className={`mt-6  ${isDark ? "dark" : "light"} bg-card-background rounded-xl p-4 border border-gray-200 flex-row items-center justify-between`}
+              >
                 <View className="flex-row items-baseline">
-                  <Text className="text-xl font-bold">
+                  <Text className={`text-xl font-[bold] ${textColor}`}>
                     ⭐ {avgRating.toFixed ? avgRating.toFixed(1) : avgRating}
                     /5
                   </Text>
-                  <Text className="text-gray-500 ml-2 text-sm">
+                  <Text
+                    className={`text-gray-500 ml-2 text-sm ${isDark ? "text-gray-300" : "text-gray-800"}`}
+                  >
                     ({totalReviews} đánh giá)
                   </Text>
                 </View>
@@ -303,8 +324,12 @@ export default function MovieDetail() {
               </View>
 
               <View className="mt-6">
-                <Text className="text-lg font-bold mb-1">Nội dung phim</Text>
-                <Text className="text-gray-700 leading-5">
+                <Text className={`text-lg font-[bold] mb-1 ${textColor}`}>
+                  Nội dung phim
+                </Text>
+                <Text
+                  className={`leading-5 ${isDark ? "text-gray-300" : "text-gray-800"}`}
+                >
                   {movie.description}
                 </Text>
               </View>
@@ -312,8 +337,17 @@ export default function MovieDetail() {
               {reviews.length > 0 && (
                 <View className="mt-8">
                   <View className="flex-row justify-between items-center mb-3">
-                    <Text className="text-lg font-bold">Đánh giá</Text>
-                    <TouchableOpacity>
+                    <Text className={`text-lg font-[bold] ${textColor}`}>
+                      Đánh giá
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        router.push({
+                          pathname: "/(app)/review/write-review",
+                          params: { movieId: movie.id },
+                        });
+                      }}
+                    >
                       <Text className="text-pink-600 font-semibold">
                         Viết đánh giá
                       </Text>
@@ -323,6 +357,22 @@ export default function MovieDetail() {
                   {reviews.map((r) => (
                     <ReviewItem key={r.id} data={r} />
                   ))}
+
+                  {totalReviews === reviews.length && (
+                    <TouchableOpacity
+                      className="mt-3 self-center"
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(app)/review/reviews",
+                          params: { movieId: movie.id },
+                        })
+                      }
+                    >
+                      <Text className="text-pink-600 font-semibold text-sm">
+                        Xem thêm bình luận
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </View>
@@ -337,9 +387,9 @@ export default function MovieDetail() {
               paddingHorizontal: 16,
               paddingBottom: insets.bottom + 8,
               paddingTop: 8,
-              backgroundColor: "white",
+              backgroundColor: isDark ? "#070f20" : "#fff",
               borderTopWidth: 1,
-              borderColor: "#e5e7eb",
+              borderColor: isDark ? "#1f2937" : "#e5e7eb",
             }}
           >
             <TouchableOpacity
