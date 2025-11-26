@@ -129,6 +129,10 @@ class ReviewService {
             avatarUrl
           }
           response {
+            userDetail {
+              fullname
+              avatarUrl
+            }
             userId
             content
             createdAt

@@ -1,6 +1,7 @@
 import { ReviewItem } from "@/components/review-item";
 import TrailerModal from "@/components/trailer-modal";
 import { useTheme } from "@/contexts/themeContext";
+import { bookingService } from "@/services/booking";
 import { movieService } from "@/services/movie";
 import { reviewService } from "@/services/review";
 import type { Movie } from "@/types/movie";
@@ -43,6 +44,7 @@ export default function MovieDetail() {
   const [reviewOverview, setReviewOverview] = useState<ReviewOverview | null>(
     null
   );
+  const [canWriteReview, setCanWriteReview] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
@@ -59,6 +61,8 @@ export default function MovieDetail() {
         setError(null);
 
         const data = await movieService.getMovieById(id as string);
+        console.log(data);
+
         if (!cancelled) setMovie(data);
       } catch (e) {
         console.error("getMovieById error:", e);
@@ -84,19 +88,20 @@ export default function MovieDetail() {
 
       (async () => {
         try {
-          // if (reviews.length === 0) setLoadingReviews(true);
           setLoadingReviews(true);
           const [overviewRes, reviewsRes] = await Promise.all([
             reviewService.getReviewOverview(movie.id),
             reviewService.getReviews({
               movieId: movie.id,
               page: 1,
-              limit: 5,
+              limit: 1,
             }),
           ]);
 
           if (cancelled) return;
           setReviewOverview(overviewRes);
+          console.log(overviewRes);
+
           setReviews(reviewsRes.data ?? []);
         } catch (e) {
           console.error("getReviews error:", e);
@@ -115,6 +120,67 @@ export default function MovieDetail() {
     }, [movie?.id])
   );
 
+  useEffect(() => {
+    if (!movie?.id) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setCanWriteReview(false);
+
+        const limit = 20;
+        let page = 1;
+        let found = false;
+
+        while (!cancelled && !found) {
+          const res = await bookingService.getMyBookings(page, limit);
+
+          const bookings = res.bookings || [];
+
+          if (!bookings.length) {
+            break;
+          }
+
+          if (
+            bookings.some((b: any) => {
+              const bookingMovieId = b.movieId ?? b.movie?.id;
+              return bookingMovieId === movie.id;
+            })
+          ) {
+            found = true;
+            break;
+          }
+
+          const hasMore =
+            res.pagination?.hasNextPage ??
+            (typeof res.pagination?.totalPages === "number"
+              ? page < res.pagination.totalPages
+              : bookings.length === limit);
+
+          if (!hasMore) break;
+
+          page += 1;
+        }
+
+        if (!cancelled) {
+          setCanWriteReview(found);
+          // setCheckingBooking(false);
+        }
+      } catch (e) {
+        console.error("getMyBooking error:", e);
+        if (!cancelled) {
+          setCanWriteReview(false);
+          // setCheckingBooking(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [movie?.id]);
+
   if (!movie) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -122,7 +188,6 @@ export default function MovieDetail() {
       </View>
     );
   }
-
   const genreBgClass = isDark ? "bg-slate-700" : "bg-slate-300";
   const genreTextClass = isDark ? "text-slate-100" : "text-slate-800";
   const textColor = isDark ? "text-white" : "text-slate-900";
@@ -334,12 +399,13 @@ export default function MovieDetail() {
                 </Text>
               </View>
 
-              {reviews.length > 0 && (
-                <View className="mt-8">
-                  <View className="flex-row justify-between items-center mb-3">
-                    <Text className={`text-lg font-[bold] ${textColor}`}>
-                      Đánh giá
-                    </Text>
+              <View className="mt-8">
+                <View className="flex-row justify-between items-center mb-3">
+                  <Text className={`text-lg font-[bold] ${textColor}`}>
+                    Đánh giá
+                  </Text>
+
+                  {canWriteReview && (
                     <TouchableOpacity
                       onPress={() => {
                         router.push({
@@ -352,29 +418,52 @@ export default function MovieDetail() {
                         Viết đánh giá
                       </Text>
                     </TouchableOpacity>
-                  </View>
-
-                  {reviews.map((r) => (
-                    <ReviewItem key={r.id} data={r} />
-                  ))}
-
-                  {totalReviews === reviews.length && (
-                    <TouchableOpacity
-                      className="mt-3 self-center"
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(app)/review/reviews",
-                          params: { movieId: movie.id },
-                        })
-                      }
-                    >
-                      <Text className="text-pink-600 font-semibold text-sm">
-                        Xem thêm bình luận
-                      </Text>
-                    </TouchableOpacity>
                   )}
                 </View>
-              )}
+
+                {loadingReviews ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator size="small" color="#9CA3AF" />
+                    <Text
+                      className={`ml-2 text-xs ${
+                        isDark ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      Đang tải bình luận...
+                    </Text>
+                  </View>
+                ) : reviews.length > 0 ? (
+                  <>
+                    {reviews.map((r) => (
+                      <ReviewItem key={r.id} data={r} />
+                    ))}
+
+                    {totalReviews > reviews.length && (
+                      <TouchableOpacity
+                        className="mt-3 self-center"
+                        onPress={() =>
+                          router.push({
+                            pathname: "/(app)/review/reviews",
+                            params: { movieId: movie.id },
+                          })
+                        }
+                      >
+                        <Text className="text-pink-600 font-semibold text-sm">
+                          Xem thêm bình luận
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  <Text
+                    className={`text-sm italic ${
+                      isDark ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    Hiện chưa có bình luận nào.
+                  </Text>
+                )}
+              </View>
             </View>
           </ScrollView>
 

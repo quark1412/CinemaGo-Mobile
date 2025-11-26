@@ -11,6 +11,7 @@ export interface ResponseItem {
   userId: string;
   content: string;
   createdAt: string;
+  userDetail: UserDetail;
 }
 
 export interface UserDetail {

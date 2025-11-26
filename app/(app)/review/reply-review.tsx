@@ -23,6 +23,44 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const ExpandableText = ({
+  content,
+  isDark,
+}: {
+  content: string;
+  isDark: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  // Giới hạn ký tự, ví dụ 120 ký tự
+  const LENGTH_THRESHOLD = 120;
+  const isLongText = content.length > LENGTH_THRESHOLD;
+
+  const bgColor = isDark ? "bg-gray-700" : "bg-gray-100";
+  const contentColor = isDark ? "text-slate-300" : "text-gray-900";
+
+  return (
+    <View className={`px-3 py-2 rounded-2xl ${bgColor}`}>
+      <Text className={`text-[14px] ${contentColor}`}>
+        {expanded || !isLongText
+          ? content
+          : content.slice(0, LENGTH_THRESHOLD) + "..."}
+      </Text>
+
+      {isLongText && (
+        <TouchableOpacity
+          onPress={() => setExpanded(!expanded)}
+          className="mt-1"
+        >
+          <Text className="text-[12px] font-semibold text-gray-500">
+            {expanded ? "Thu gọn" : "Xem thêm"}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
 const formatReviewDate = (value?: string | null) => {
   if (!value) return "";
 
@@ -105,10 +143,6 @@ export default function ReplyReviewScreen() {
   const commentInputRef = useRef<TextInput | null>(null);
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  const [replyUserMap, setReplyUserMap] = useState<
-    Record<string, { fullname: string; avatarUrl?: string | null }>
-  >({});
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -364,51 +398,64 @@ export default function ReplyReviewScreen() {
           )}
 
           <View
-            className={`flex-row border-b border-gray-100 px-3 py-3 ${isDark ? "dark" : "light"} bg-muted-background`}
+            className={`flex-row border-gray-100 border-b py-3 ${isDark ? "dark" : "light"} bg-muted-background`}
           >
             <TouchableOpacity
               className="flex-1 flex-row items-center justify-center gap-2 border-l border-gray-100"
               onPress={() => commentInputRef.current?.focus()}
             >
-              <Ionicons name="chatbubble-outline" size={20} color="#4b5563" />
-              <Text className="text-gray-600 font-medium">Bình luận</Text>
+              <Ionicons
+                name="chatbubble-outline"
+                size={20}
+                color={isDark ? "#ffff" : "#4b5563"}
+              />
+              <Text
+                className={` ${isDark ? "text-slate-200" : "text-gray-600"} font-[medium]`}
+              >
+                Bình luận
+              </Text>
             </TouchableOpacity>
           </View>
 
           {review.response && review.response.length > 0 && (
-            <View className="mt-2">
-              <Text className="text-[13px] font-semibold mb-2 ml-2">
+            <View
+              className={`mt-2 ${isDark ? "dark" : "light"} bg-card-background`}
+            >
+              <Text
+                className={`text-[13px] font-[semibold] mb-2 ml-2 ${textColor}`}
+              >
                 Phản hồi ({review.response.length})
               </Text>
 
               {review.response.map((rep, idx) => {
-                const u = replyUserMap[rep.userId];
-                const avatarUrl = u?.avatarUrl || "https://i.pravatar.cc/100";
-                const displayName = u?.fullname || "Người phản hồi";
+                const avatarUrl =
+                  rep.userDetail?.avatarUrl || "https://i.pravatar.cc/100";
+                const displayName =
+                  rep.userDetail?.fullname || "Người phản hồi";
 
                 return (
                   <View key={idx} className="flex-row mb-3 ml-3">
-                    {/* Avatar bên trái */}
                     <Image
                       source={{ uri: avatarUrl }}
                       className="w-8 h-8 rounded-full mr-2 bg-gray-200"
                     />
 
-                    {/* Nội dung bên phải */}
                     <View className="flex-1">
-                      {/* Tên */}
-                      <Text className="text-[13px] font-semibold text-gray-900">
+                      <Text
+                        className={`text-[13px] font-[semibold] ${textColor}`}
+                      >
                         {displayName}
                       </Text>
 
-                      {/* Bubble nội dung */}
                       <View className="mt-1 max-w-[80%]">
-                        <Text className="bg-gray-100 px-3 py-2 rounded-2xl text-[14px] text-gray-900">
+                        {/* <Text
+                          className={` ${isDark ? "bg-gray-500" : "bg-gray-100"} px-3 py-2 rounded-2xl text-[14px] ${isDark ? "text-slate-300" : "text-gray-900"} `}
+                        >
                           {rep.content}
-                        </Text>
+                        </Text> */}
+                        <ExpandableText content={rep.content} isDark={isDark} />
                       </View>
 
-                      {/* Dòng thời gian + Thích */}
                       <View className="flex-row items-center mt-1">
                         <Text className="text-[11px] text-gray-400">
                           {formatReplyTime(rep.createdAt)}
@@ -420,8 +467,11 @@ export default function ReplyReviewScreen() {
               })}
             </View>
           )}
+
           {review.response && review.response.length === 0 && (
-            <View className="py-8 items-center justify-center bg-white min-h-[200px]">
+            <View
+              className={`py-8 items-center justify-center  ${isDark ? "dark" : "light"} bg-muted-background min-h-[200px]`}
+            >
               <View className="bg-gray-100 p-4 rounded-full mb-3">
                 <Ionicons name="chatbox-ellipses" size={32} color="#9ca3af" />
               </View>
@@ -437,26 +487,24 @@ export default function ReplyReviewScreen() {
           )}
         </ScrollView>
 
-        {/* --- FOOTER INPUT --- */}
-
         <View
           style={{
             paddingBottom: 8 + (isKeyboardVisible ? 0 : insets.bottom),
             paddingTop: 8,
-            backgroundColor: "white",
+
             borderTopWidth: 1,
-            borderColor: "#f3f4f6",
+            borderColor: isDark ? "#1e293b" : "#f3f4f6",
           }}
-          className="px-3 flex-row items-center"
+          className={`px-3 flex-row items-center ${isDark ? "dark" : "light"} bg-background`}
         >
-          {/* Current User Avatar */}
           <Image
-            source={{ uri: user?.avatarUrl }} // Ảnh user đang login
+            source={{ uri: user?.avatarUrl }}
             className="w-8 h-8 rounded-full mr-2"
           />
 
-          {/* Input Box */}
-          <View className="flex-1 flex-row items-center bg-gray-100 rounded-full px-4 py-2 mr-2">
+          <View
+            className={`flex-1 flex-row items-center ${isDark ? "bg-gray-300" : "bg-gray-100"}  rounded-full px-4 py-2 mr-2`}
+          >
             <TextInput
               ref={commentInputRef}
               multiline
@@ -464,10 +512,14 @@ export default function ReplyReviewScreen() {
               className="flex-1 text-sm text-gray-800 py-1"
               value={commentText}
               onChangeText={setCommentText}
+              style={{
+                maxHeight: 50,
+                paddingTop: 0,
+                paddingBottom: 0,
+              }}
             />
           </View>
 
-          {/* Send Button */}
           {commentText.length > 0 && (
             <TouchableOpacity onPress={handleSendReply} disabled={sending}>
               <Ionicons name="send" size={24} color="#ec4899" />

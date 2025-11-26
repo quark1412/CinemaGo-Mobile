@@ -1,5 +1,6 @@
 import { ReviewItem } from "@/components/review-item";
 import { useTheme } from "@/contexts/themeContext";
+import { bookingService } from "@/services/booking";
 import { movieService } from "@/services/movie";
 import { reviewService } from "@/services/review";
 import type { Movie } from "@/types/movie";
@@ -32,6 +33,7 @@ export default function ReviewListScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [canWriteReview, setCanWriteReview] = useState(false);
 
   const PAGE_SIZE = 10;
 
@@ -47,6 +49,7 @@ export default function ReviewListScreen() {
         try {
           setLoading(true);
           setError(null);
+          setCanWriteReview(false);
 
           const [mv, ov, listRes] = await Promise.all([
             movieService.getMovieById(movieId as string),
@@ -59,6 +62,7 @@ export default function ReviewListScreen() {
           ]);
 
           if (cancelled) return;
+
           setMovie(mv);
           setOverview(ov);
           setReviews(listRes.data ?? []);
@@ -67,6 +71,51 @@ export default function ReviewListScreen() {
             (listRes.pagination?.currentPage ?? 1) <
               (listRes.pagination?.totalPages ?? 1)
           );
+
+          // === CHECK getMyBooking: user đã từng đặt vé phim này chưa? ===
+          try {
+            const limitBooking = 20;
+            let bookingPage = 1;
+            let found = false;
+
+            while (!cancelled && !found) {
+              const bookingRes = await bookingService.getMyBookings(
+                bookingPage,
+                limitBooking
+              );
+
+              // tuỳ API, chỉnh lại field cho đúng:
+              const bookings = bookingRes.bookings || [];
+
+              if (!bookings.length) break;
+
+              if (
+                bookings.some((b: any) => {
+                  const bookingMovieId = b.movieId ?? b.movie?.id;
+                  return bookingMovieId === movieId;
+                })
+              ) {
+                found = true;
+                break;
+              }
+
+              const hasMoreBookings =
+                bookingRes.pagination?.hasNextPage ??
+                (typeof bookingRes.pagination?.totalPages === "number"
+                  ? bookingPage < bookingRes.pagination.totalPages
+                  : bookings.length === limitBooking);
+
+              if (!hasMoreBookings) break;
+              bookingPage += 1;
+            }
+
+            if (!cancelled) {
+              setCanWriteReview(found);
+            }
+          } catch (e) {
+            console.error("getMyBooking for review-list error:", e);
+            if (!cancelled) setCanWriteReview(false);
+          }
         } catch (e) {
           console.error("load review-list error:", e);
           if (!cancelled) setError("Không tải được danh sách đánh giá.");
@@ -123,10 +172,12 @@ export default function ReviewListScreen() {
   const high = (dist[3] ?? 0) + (dist[4] ?? 0);
   const medium = dist[2] ?? 0;
   const low = (dist[0] ?? 0) + (dist[1] ?? 0);
-
+  const textColor = isDark ? "text-white" : "text-slate-900";
   if (loading && !movie) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View
+        className={`flex-1 items-center justify-center ${isDark ? "dark" : "light"} bg-muted-background`}
+      >
         <ActivityIndicator />
         <Text className="mt-2 text-gray-500 text-sm">
           Đang tải danh sách đánh giá...
@@ -137,8 +188,10 @@ export default function ReviewListScreen() {
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <Text className="text-sm text-gray-600">{error}</Text>
+      <View
+        className={`flex-1 items-center justify-center ${isDark ? "dark" : "light"} bg-muted-background`}
+      >
+        <Text className={`text-sm ${textColor}`}>{error}</Text>
       </View>
     );
   }
@@ -179,46 +232,58 @@ export default function ReviewListScreen() {
             Đánh giá
           </Text>
 
-          <TouchableOpacity
-            style={{ position: "absolute", right: 8 }}
-            onPress={() =>
-              router.push({
-                pathname: "/(app)/review/write-review",
-                params: { movieId },
-              })
-            }
-          >
-            <Text style={{ color: "#ec4899", fontWeight: "600", fontSize: 13 }}>
-              Viết đánh giá
-            </Text>
-          </TouchableOpacity>
+          {canWriteReview && (
+            <TouchableOpacity
+              style={{ position: "absolute", right: 8 }}
+              onPress={() =>
+                router.push({
+                  pathname: "/(app)/review/write-review",
+                  params: { movieId },
+                })
+              }
+            >
+              <Text
+                style={{ color: "#ec4899", fontWeight: "600", fontSize: 13 }}
+              >
+                Viết đánh giá
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      <View className="flex-1 bg-white">
+      <View
+        className={`flex-1  ${isDark ? "dark" : "light"} bg-muted-background`}
+      >
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
         >
-          <View className="m-4 rounded-2xl bg-gray-50 border border-gray-200 p-4">
-            <Text className="font-semibold text-base mb-3">
+          <View
+            className={`m-4 rounded-2xl ${isDark ? "" : "bg-gray-100"} border border-gray-200 p-4`}
+          >
+            <Text className={`font-[semibold] text-base mb-3 ${textColor}`}>
               Tổng quan đánh giá
             </Text>
 
             <View className="flex-row">
-              {/* điểm trung bình */}
               <View className="items-center mr-6">
-                <Text className="text-3xl font-extrabold text-pink-500">
+                <Text className="text-3xl font-[extraBold] text-pink-500">
                   {avgRating.toFixed ? avgRating.toFixed(1) : avgRating}
                 </Text>
-                <Text className="text-xs text-gray-500 mb-1">/5</Text>
-                <Text className="text-[11px] text-gray-500">
+                <Text
+                  className={`text-xs ${isDark ? "text-slate-200" : "text-gray-500"} mb-1`}
+                >
+                  /5
+                </Text>
+                <Text
+                  className={`text-[11px]  ${isDark ? "text-slate-200" : "text-gray-500"}`}
+                >
                   ({totalReviews} đánh giá)
                 </Text>
               </View>
 
-              {/* cột phân bố */}
               <View className="flex-1 justify-center">
                 {bars
                   .slice()
@@ -236,7 +301,9 @@ export default function ReviewListScreen() {
                         key={label}
                         className="flex-row items-center mb-1.5"
                       >
-                        <Text className="w-8 text-[11px] text-gray-600">
+                        <Text
+                          className={`w-8 text-[11px] ${isDark ? "text-slate-200" : "text-gray-600"}`}
+                        >
                           {label}
                         </Text>
                         <View className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden mx-2">
@@ -249,7 +316,9 @@ export default function ReviewListScreen() {
                             }}
                           />
                         </View>
-                        <Text className="w-10 text-right text-[11px] text-gray-500">
+                        <Text
+                          className={`w-10 text-right text-[11px]  ${isDark ? "text-slate-200" : "text-gray-500"}`}
+                        >
                           {b.count}
                         </Text>
                       </View>
@@ -258,7 +327,6 @@ export default function ReviewListScreen() {
               </View>
             </View>
 
-            {/* tag cảm nhận đơn giản */}
             <View className="flex-row flex-wrap mt-3">
               <Tag label={`Tuyệt vời (${high})`} />
               <Tag label={`Ổn áp (${medium})`} />
@@ -269,8 +337,12 @@ export default function ReviewListScreen() {
           {/* Danh sách bài viết */}
           <View className="px-4">
             <View className="flex-row justify-between items-center mb-3">
-              <Text className="font-bold text-base">Danh sách bài viết</Text>
-              <Text className="text-xs text-gray-500">
+              <Text className={`font-[bold] text-base ${textColor}`}>
+                Danh sách bài viết
+              </Text>
+              <Text
+                className={`text-xs   ${isDark ? "text-white" : "text-gray-500"} `}
+              >
                 {totalReviews} bài viết
               </Text>
             </View>

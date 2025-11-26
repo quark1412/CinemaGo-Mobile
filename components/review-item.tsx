@@ -73,7 +73,7 @@ export function ReviewItem({ data }: Props) {
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={handleGoToReply}
-      className={`bg-white rounded-xl p-4 mb-4 border border-gray-200 relative ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+      className={` rounded-xl p-4 mb-4 border border-gray-200 relative ${isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
     >
       {/* header */}
       <View className="flex-row justify-between items-center">
