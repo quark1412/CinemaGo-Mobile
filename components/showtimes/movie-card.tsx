@@ -1,6 +1,7 @@
 import { useTheme } from "@/contexts/themeContext";
 import type { MovieWithLabels } from "@/hook/useCinemaShowtimes";
 import type { Showtime } from "@/types/showtime";
+import { handleMovieTrailerPress } from "@/utils/trailerHelper";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -195,7 +196,12 @@ export default function MovieCard({
 
             <Pressable
               onPress={() => {
-                // TODO: điều hướng sang màn chi tiết phim nếu có
+                router.push({
+                  pathname: "/(app)/movies/[id]",
+                  params: {
+                    id: m.id,
+                  },
+                });
               }}
             >
               <Text className="text-pink-500 font-semibold">Chi tiết</Text>
@@ -260,38 +266,36 @@ export default function MovieCard({
           )}
 
           <Pressable
-            onPress={() => {
-              if (!m.trailerUrl) return;
+            // onPress={() => {
+            //   if (!m.trailerUrl) return;
 
-              const url = m.trailerUrl.trim();
-              console.log(">>> Trailer pressed:", url);
+            //   const url = m.trailerUrl.trim();
 
-              if (isYoutubeUrl(url)) {
-                const id = getYoutubeId(url);
-                console.log(">>> youtube id:", id);
+            //   if (isYoutubeUrl(url)) {
+            //     const id = getYoutubeId(url);
 
-                if (!id) return;
+            //     if (!id) return;
 
-                router.push({
-                  pathname: "/showtimes/trailer",
-                  params: {
-                    youtubeId: id,
-                    title: m.title ?? "",
-                  },
-                });
-                console.log("huhu");
-                return;
-              }
+            //     router.push({
+            //       pathname: "/showtimes/trailer",
+            //       params: {
+            //         youtubeId: id,
+            //         title: m.title ?? "",
+            //       },
+            //     });
+            //     return;
+            //   }
 
-              if (!onPressTrailer) return;
+            //   if (!onPressTrailer) return;
 
-              console.log("cloudinary");
+            //   console.log("cloudinary");
 
-              const optimized = buildOptimizedTrailerUrl(m.trailerUrl);
-              if (!optimized) return;
+            //   const optimized = buildOptimizedTrailerUrl(m.trailerUrl);
+            //   if (!optimized) return;
 
-              onPressTrailer(optimized);
-            }}
+            //   onPressTrailer(optimized);
+            // }}
+            onPress={() => handleMovieTrailerPress(m, onPressTrailer)}
             disabled={!m.trailerUrl}
             className="flex-row items-center mt-1"
           >

@@ -20,6 +20,7 @@ export const authService = {
       );
 
       const { accessToken, refreshToken } = response.data;
+      console.log(accessToken);
 
       await AsyncStorage.setItem("accessToken", accessToken);
       await AsyncStorage.setItem("refreshToken", refreshToken);
@@ -37,6 +38,7 @@ export const authService = {
     } as any);
 
     const { accessToken, refreshToken: newRefreshToken } = res.data;
+    console.log(accessToken);
 
     await AsyncStorage.setItem("accessToken", accessToken);
     await AsyncStorage.setItem("refreshToken", newRefreshToken);

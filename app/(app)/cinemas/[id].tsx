@@ -1,13 +1,13 @@
+import TrailerModal from "@/components/trailer-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { useVideoPlayer } from "expo-video";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Linking,
-  Modal,
   Pressable,
   Text,
   View,
@@ -82,6 +82,11 @@ export default function Showtimes() {
   const handleOpenTrailer = (url: string) => {
     setCurrentTrailer(url);
     setShowTrailer(true);
+  };
+
+  const handleCloseTrailer = () => {
+    setShowTrailer(false);
+    setCurrentTrailer(null);
   };
 
   const handlePressShowtime = (st: any, movie: MovieWithLabels) => {
@@ -179,58 +184,11 @@ export default function Showtimes() {
         />
       )}
 
-      <Modal
-        visible={showTrailer && !!currentTrailer}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTrailer(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-4">
-          {currentTrailer ? (
-            <View
-              className="w-full"
-              style={{
-                height: 250,
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <VideoView
-                player={player}
-                style={{ width: "100%", height: "100%" }}
-                nativeControls
-                contentFit="contain"
-                onFirstFrameRender={() => setVideoLoading(false)}
-                // onError={(error) => {
-                //   console.log("Lỗi play video:", error);
-                //   setVideoLoading(false); // Tắt loading để user biết mà đóng
-                // }}
-              />
-
-              {videoLoading && (
-                <View className="absolute inset-0 items-center justify-center">
-                  <ActivityIndicator size="small" color="#ffffff" />
-                  <Text className="mt-2 text-xs text-white">
-                    Đang tải trailer...
-                  </Text>
-                </View>
-              )}
-            </View>
-          ) : null}
-
-          <Pressable
-            onPress={() => {
-              try {
-                player.pause();
-              } catch {}
-              setShowTrailer(false);
-            }}
-            className="mt-4 bg-gray-300 px-4 py-2 rounded-lg"
-          >
-            <Text className="font-semibold text-gray-800">Đóng</Text>
-          </Pressable>
-        </View>
-      </Modal>
+      <TrailerModal
+        visible={showTrailer}
+        trailerUrl={currentTrailer}
+        onClose={handleCloseTrailer}
+      />
     </SafeAreaView>
   );
 }
