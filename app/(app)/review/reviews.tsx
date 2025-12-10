@@ -1,6 +1,5 @@
 import { ReviewItem } from "@/components/review-item";
 import { useTheme } from "@/contexts/themeContext";
-import { bookingService } from "@/services/booking";
 import { movieService } from "@/services/movie";
 import { reviewService } from "@/services/review";
 import type { Movie } from "@/types/movie";
@@ -33,7 +32,7 @@ export default function ReviewListScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [canWriteReview, setCanWriteReview] = useState(false);
+  // const [canWriteReview, setCanWriteReview] = useState(false);
 
   const PAGE_SIZE = 10;
 
@@ -49,7 +48,7 @@ export default function ReviewListScreen() {
         try {
           setLoading(true);
           setError(null);
-          setCanWriteReview(false);
+          // setCanWriteReview(false);
 
           const [mv, ov, listRes] = await Promise.all([
             movieService.getMovieById(movieId as string),
@@ -71,51 +70,6 @@ export default function ReviewListScreen() {
             (listRes.pagination?.currentPage ?? 1) <
               (listRes.pagination?.totalPages ?? 1)
           );
-
-          // === CHECK getMyBooking: user đã từng đặt vé phim này chưa? ===
-          try {
-            const limitBooking = 20;
-            let bookingPage = 1;
-            let found = false;
-
-            while (!cancelled && !found) {
-              const bookingRes = await bookingService.getMyBookings(
-                bookingPage,
-                limitBooking
-              );
-
-              // tuỳ API, chỉnh lại field cho đúng:
-              const bookings = bookingRes.bookings || [];
-
-              if (!bookings.length) break;
-
-              if (
-                bookings.some((b: any) => {
-                  const bookingMovieId = b.movieId ?? b.movie?.id;
-                  return bookingMovieId === movieId;
-                })
-              ) {
-                found = true;
-                break;
-              }
-
-              const hasMoreBookings =
-                bookingRes.pagination?.hasNextPage ??
-                (typeof bookingRes.pagination?.totalPages === "number"
-                  ? bookingPage < bookingRes.pagination.totalPages
-                  : bookings.length === limitBooking);
-
-              if (!hasMoreBookings) break;
-              bookingPage += 1;
-            }
-
-            if (!cancelled) {
-              setCanWriteReview(found);
-            }
-          } catch (e) {
-            console.error("getMyBooking for review-list error:", e);
-            if (!cancelled) setCanWriteReview(false);
-          }
         } catch (e) {
           console.error("load review-list error:", e);
           if (!cancelled) setError("Không tải được danh sách đánh giá.");
@@ -169,9 +123,6 @@ export default function ReviewListScreen() {
     return { label: RATING_LABELS[idx] ?? `${idx + 1}★`, count };
   });
 
-  const high = (dist[3] ?? 0) + (dist[4] ?? 0);
-  const medium = dist[2] ?? 0;
-  const low = (dist[0] ?? 0) + (dist[1] ?? 0);
   const textColor = isDark ? "text-white" : "text-slate-900";
   if (loading && !movie) {
     return (
@@ -232,23 +183,19 @@ export default function ReviewListScreen() {
             Đánh giá
           </Text>
 
-          {canWriteReview && (
-            <TouchableOpacity
-              style={{ position: "absolute", right: 8 }}
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/review/write-review",
-                  params: { movieId },
-                })
-              }
-            >
-              <Text
-                style={{ color: "#ec4899", fontWeight: "600", fontSize: 13 }}
-              >
-                Viết đánh giá
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={{ position: "absolute", right: 8 }}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/review/write-review",
+                params: { movieId },
+              })
+            }
+          >
+            <Text style={{ color: "#ec4899", fontWeight: "600", fontSize: 13 }}>
+              Viết đánh giá
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -326,12 +273,6 @@ export default function ReviewListScreen() {
                   })}
               </View>
             </View>
-
-            <View className="flex-row flex-wrap mt-3">
-              <Tag label={`Tuyệt vời (${high})`} />
-              <Tag label={`Ổn áp (${medium})`} />
-              <Tag label={`Bình thường (${low})`} />
-            </View>
           </View>
 
           {/* Danh sách bài viết */}
@@ -376,14 +317,5 @@ export default function ReviewListScreen() {
         </ScrollView>
       </View>
     </>
-  );
-}
-
-// small chip
-function Tag({ label }: { label: string }) {
-  return (
-    <View className="bg-pink-50 border border-pink-200 rounded-full px-3 py-1 mr-2 mb-2">
-      <Text className="text-[11px] text-pink-700 font-medium">{label}</Text>
-    </View>
   );
 }

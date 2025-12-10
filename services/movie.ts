@@ -8,6 +8,10 @@ const getMsg = (e: unknown, fb: string) =>
     ? (e.response?.data?.message ?? e.message ?? fb)
     : fb;
 
+interface GetTopRatedMoviesParams {
+  limit?: number;
+}
+
 // ===== Service =====
 class MovieService {
   // GET /movies/public -> { pagination, data }
@@ -20,6 +24,20 @@ class MovieService {
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách phim.");
       console.error("Get movies error:", e);
+      throw new Error(msg);
+    }
+  }
+
+  async getTopRatedMovies(params?: GetTopRatedMoviesParams): Promise<Movie[]> {
+    try {
+      const { data } = await axiosConfig.get<MoviesResponse>(
+        "/movies/public/top-rated",
+        { params }
+      );
+      return data.data;
+    } catch (e: unknown) {
+      const msg = getMsg(e, "Không thể lấy danh sách phim top rating.");
+      console.error("Get top rated movies error:", e);
       throw new Error(msg);
     }
   }
