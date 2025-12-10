@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 import { Image, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// ⬇️ các hàm sinh trắc học bạn đã tạo
 import {
   canUseBiometric,
   disableBiometricLogin,

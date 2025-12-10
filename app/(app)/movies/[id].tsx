@@ -190,7 +190,6 @@ export default function MovieDetail() {
   const genreBgClass = isDark ? "bg-slate-700" : "bg-slate-300";
   const genreTextClass = isDark ? "text-slate-100" : "text-slate-800";
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const iconColor = isDark ? "#fff" : "#0f172a";
 
   const onPressTrailer = () => {
     if (!movie.trailerUrl) return;

@@ -12,6 +12,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -27,13 +28,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
   const router = useRouter();
-  const { login, refreshUser } = useUser();
-  const { isDark, toggleTheme } = useTheme();
+  const { login, refreshUser, isAuthenticated } = useUser();
+  const { isDark } = useTheme();
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   // Biometrics state
   const [bioSupported, setBioSupported] = useState(false);
@@ -50,17 +52,16 @@ export default function SignIn() {
         if (compatible && enrolled) {
           const types =
             await LocalAuthentication.supportedAuthenticationTypesAsync();
-          // Ưu tiên Face ID nếu có, nếu không thì Touch ID
           if (
             types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
           ) {
-            setBioLabel("Touch ID"); // hoặc "Vân tay"
+            setBioLabel("Touch ID");
           } else if (
             types.includes(
               LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
             )
           ) {
-            setBioLabel("Face ID"); // hoặc "Khuôn mặt"
+            setBioLabel("Face ID");
           } else {
             setBioLabel("Biometric");
           }
@@ -72,6 +73,33 @@ export default function SignIn() {
         setCheckingBio(false);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        const refreshToken = await AsyncStorage.getItem("refreshToken");
+
+        if (refreshToken) {
+          console.log("Phát hiện Refresh Token, đang thử khôi phục phiên...");
+
+          await authService.loginWithRefreshToken(refreshToken);
+
+          await refreshUser();
+
+          showToast("Chào mừng bạn quay lại!", "success");
+          router.replace("/(app)/(tabs)/home");
+          return;
+        }
+      } catch (error) {
+        console.log("Phiên đăng nhập đã hết hạn hoặc lỗi:", error);
+        await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkAutoLogin();
   }, []);
 
   const onSignIn = async () => {
@@ -114,6 +142,24 @@ export default function SignIn() {
       return;
     }
   };
+
+  if (isCheckingSession) {
+    return (
+      <ImageBackground
+        source={{
+          uri: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=1600&auto=format&fit=crop",
+        }}
+        resizeMode="cover"
+        className="flex-1 justify-center items-center"
+      >
+        <View className="absolute inset-0 bg-black/70" />
+        <ActivityIndicator size="large" color="#eab308" />
+        <Text className="text-white mt-4 font-medium">
+          Đang kiểm tra phiên đăng nhập...
+        </Text>
+      </ImageBackground>
+    );
+  }
 
   return (
     <ImageBackground

@@ -65,7 +65,6 @@ export function ReviewItem({ data }: Props) {
   };
 
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (
     <TouchableOpacity

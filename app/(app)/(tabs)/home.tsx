@@ -99,7 +99,7 @@ export default function Home() {
       return () => {
         isCancelled = true;
       };
-    }, []) // Dependency rỗng để mỗi khi focus lại nó sẽ chạy lại hàm fetchData
+    }, [])
   );
 
   const x = useRef(new Animated.Value(0)).current;
@@ -120,14 +120,6 @@ export default function Home() {
     router.push("/(app)/search/search");
   }
 
-  // const scrollToMiddle = useCallback(() => {
-  //   if (!featuredMovies.length) return;
-
-  //   flatListRef.current?.scrollToOffset({
-  //     offset: START_INDEX * ITEM_SIZE,
-  //     animated: false,
-  //   });
-  // }, [ITEM_SIZE, START_INDEX, featuredMovies.length]);
   const scrollToMiddle = useCallback(() => {
     if (!shouldLoop || !flatListRef.current) return;
 
@@ -147,33 +139,6 @@ export default function Home() {
     scrollToMiddle();
   }, [scrollToMiddle]);
 
-  // const onMomentumScrollEnd = (event: any) => {
-  //   if (!featuredMovies.length) return;
-  //   const offsetX = event.nativeEvent.contentOffset.x;
-
-  //   let index = Math.round(offsetX / ITEM_SIZE);
-  //   indexRef.current = index;
-
-  //   flatListRef.current?.scrollToOffset({
-  //     offset: index * ITEM_SIZE,
-  //     animated: true,
-  //   });
-
-  //   setTimeout(() => {
-  //     const baseIndex =
-  //       ((index % featuredMovies.length) + featuredMovies.length) %
-  //       featuredMovies.length;
-  //     const newIndex = START_INDEX + baseIndex;
-
-  //     if (newIndex !== index) {
-  //       flatListRef.current?.scrollToOffset({
-  //         offset: newIndex * ITEM_SIZE,
-  //         animated: false,
-  //       });
-  //       indexRef.current = newIndex;
-  //     }
-  //   }, 50);
-  // };
   const onMomentumScrollEnd = (event: any) => {
     if (!shouldLoop) return;
 
