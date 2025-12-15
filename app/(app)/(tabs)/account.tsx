@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 import { Image, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// ⬇️ các hàm sinh trắc học bạn đã tạo
 import {
   canUseBiometric,
   disableBiometricLogin,
@@ -20,7 +19,7 @@ import {
 export default function Account() {
   const { showToast } = useToast();
   const { toggleTheme, isDark } = useTheme();
-  const { user } = useUser();
+  const { user, logout } = useUser();
 
   const [bioSupported, setBioSupported] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
@@ -72,9 +71,7 @@ export default function Account() {
   };
 
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove(["user", "accessToken", "refreshToken"]);
-
-    router.replace("/auth/sign-in");
+    logout();
   };
 
   return (

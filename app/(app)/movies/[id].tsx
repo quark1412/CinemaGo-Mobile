@@ -1,7 +1,6 @@
 import { ReviewItem } from "@/components/review-item";
 import TrailerModal from "@/components/trailer-modal";
 import { useTheme } from "@/contexts/themeContext";
-import { bookingService } from "@/services/booking";
 import { movieService } from "@/services/movie";
 import { reviewService } from "@/services/review";
 import type { Movie } from "@/types/movie";
@@ -44,7 +43,7 @@ export default function MovieDetail() {
   const [reviewOverview, setReviewOverview] = useState<ReviewOverview | null>(
     null
   );
-  const [canWriteReview, setCanWriteReview] = useState(false);
+  // const [canWriteReview, setCanWriteReview] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
@@ -120,66 +119,66 @@ export default function MovieDetail() {
     }, [movie?.id])
   );
 
-  useEffect(() => {
-    if (!movie?.id) return;
+  // useEffect(() => {
+  //   if (!movie?.id) return;
 
-    let cancelled = false;
+  //   let cancelled = false;
 
-    (async () => {
-      try {
-        setCanWriteReview(false);
+  //   (async () => {
+  //     try {
+  //       setCanWriteReview(false);
 
-        const limit = 20;
-        let page = 1;
-        let found = false;
+  //       const limit = 20;
+  //       let page = 1;
+  //       let found = false;
 
-        while (!cancelled && !found) {
-          const res = await bookingService.getMyBookings(page, limit);
+  //       while (!cancelled && !found) {
+  //         const res = await bookingService.getMyBookings(page, limit);
 
-          const bookings = res.bookings || [];
+  //         const bookings = res.bookings || [];
 
-          if (!bookings.length) {
-            break;
-          }
+  //         if (!bookings.length) {
+  //           break;
+  //         }
 
-          if (
-            bookings.some((b: any) => {
-              const bookingMovieId = b.movieId ?? b.movie?.id;
-              return bookingMovieId === movie.id;
-            })
-          ) {
-            found = true;
-            break;
-          }
+  //         if (
+  //           bookings.some((b: any) => {
+  //             const bookingMovieId = b.movieId ?? b.movie?.id;
+  //             return bookingMovieId === movie.id;
+  //           })
+  //         ) {
+  //           found = true;
+  //           break;
+  //         }
 
-          const hasMore =
-            res.pagination?.hasNextPage ??
-            (typeof res.pagination?.totalPages === "number"
-              ? page < res.pagination.totalPages
-              : bookings.length === limit);
+  //         const hasMore =
+  //           res.pagination?.hasNextPage ??
+  //           (typeof res.pagination?.totalPages === "number"
+  //             ? page < res.pagination.totalPages
+  //             : bookings.length === limit);
 
-          if (!hasMore) break;
+  //         if (!hasMore) break;
 
-          page += 1;
-        }
+  //         page += 1;
+  //       }
 
-        if (!cancelled) {
-          setCanWriteReview(found);
-          // setCheckingBooking(false);
-        }
-      } catch (e) {
-        console.error("getMyBooking error:", e);
-        if (!cancelled) {
-          setCanWriteReview(false);
-          // setCheckingBooking(false);
-        }
-      }
-    })();
+  //       if (!cancelled) {
+  //         setCanWriteReview(found);
+  //         // setCheckingBooking(false);
+  //       }
+  //     } catch (e) {
+  //       console.error("getMyBooking error:", e);
+  //       if (!cancelled) {
+  //         setCanWriteReview(false);
+  //         // setCheckingBooking(false);
+  //       }
+  //     }
+  //   })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [movie?.id]);
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [movie?.id]);
 
   if (!movie) {
     return (
@@ -191,7 +190,6 @@ export default function MovieDetail() {
   const genreBgClass = isDark ? "bg-slate-700" : "bg-slate-300";
   const genreTextClass = isDark ? "text-slate-100" : "text-slate-800";
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const iconColor = isDark ? "#fff" : "#0f172a";
 
   const onPressTrailer = () => {
     if (!movie.trailerUrl) return;
@@ -405,20 +403,18 @@ export default function MovieDetail() {
                     Đánh giá
                   </Text>
 
-                  {canWriteReview && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        router.push({
-                          pathname: "/(app)/review/write-review",
-                          params: { movieId: movie.id },
-                        });
-                      }}
-                    >
-                      <Text className="text-pink-600 font-semibold">
-                        Viết đánh giá
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      router.push({
+                        pathname: "/(app)/review/write-review",
+                        params: { movieId: movie.id },
+                      });
+                    }}
+                  >
+                    <Text className="text-pink-600 font-semibold">
+                      Viết đánh giá
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
                 {loadingReviews ? (

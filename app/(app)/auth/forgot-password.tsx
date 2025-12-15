@@ -1,4 +1,5 @@
-import axios from "axios";
+import { useTheme } from "@/contexts/themeContext";
+import { authService } from "@/services/users/auth";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -17,6 +18,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ForgotPassword() {
   const router = useRouter();
+  const { isDark } = useTheme();
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -29,15 +32,15 @@ export default function ForgotPassword() {
 
     try {
       setLoading(true);
-      const res = await axios.post("http://YOUR_API_URL/auth/forgot-password", {
-        email,
-      });
-      setMessage(res.data.message || "OTP đã được gửi đến email của bạn.");
+      const res = await authService.forgotPassword(email);
+      setMessage(res.data || "OTP đã được gửi đến email của bạn.");
       router.push({
         pathname: "/auth/reset-password",
         params: { email },
       });
     } catch (err: any) {
+      console.log("Full Error:", err);
+      console.log("Response:", err.response);
       setMessage(
         err.response?.data?.message || "Có lỗi xảy ra, vui lòng thử lại."
       );
@@ -87,16 +90,20 @@ export default function ForgotPassword() {
                 </Text>
               </View>
 
-              <View className="mt-10 rounded-2xl bg-white/95 p-5 shadow-2xl border border-yellow-400/40">
-                <Text className="text-2xl font-extrabold text-black text-center">
+              <View
+                className={`mt-10 rounded-2xl ${isDark ? "dark" : "light"} bg-background p-5 shadow-2xl border border-yellow-400/40`}
+              >
+                <Text className="text-2xl font-extrabold text-foreground text-center">
                   Quên mật khẩu
                 </Text>
-                <Text className="text-black/60 mt-1 text-center">
+                <Text className="text-foreground mt-1 text-center">
                   Nhập email để nhận mã OTP
                 </Text>
 
                 <View className="mt-6">
-                  <Text className="text-[13px] text-black/70 mb-2">Email</Text>
+                  <Text className="text-[13px] text-foreground mb-2">
+                    Email
+                  </Text>
                   <View className="rounded-xl border border-black/10 bg-white">
                     <TextInput
                       placeholder="you@example.com"
@@ -122,7 +129,7 @@ export default function ForgotPassword() {
                 </Pressable>
 
                 {message ? (
-                  <Text className="text-center text-black/60 mt-4">
+                  <Text className="text-center text-foreground mt-4">
                     {message}
                   </Text>
                 ) : null}

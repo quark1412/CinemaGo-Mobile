@@ -21,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function SignUp() {
   const router = useRouter();
   const { showToast } = useToast();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark } = useTheme();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,7 +32,6 @@ export default function SignUp() {
   const [acceptTos, setAcceptTos] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // errors
   const [errName, setErrName] = useState<string | null>(null);
   const [errEmail, setErrEmail] = useState<string | null>(null);
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
@@ -77,28 +76,29 @@ export default function SignUp() {
 
       const payload = {
         email,
-        fullname: fullName, // BE yêu cầu key fullname
+        fullname: fullName,
         password: pwd,
-        gender: gender, // thêm gender
+        gender: gender,
+        device: "mobile",
       };
 
-      const response = await authService.signup(
+      await authService.signup(
         payload.email,
         payload.fullname,
         payload.password,
-        payload.gender
+        payload.gender,
+        payload.device
       );
 
-      // Sau khi đăng ký thành công → điều hướng sign-in
-      console.log(response);
+      showToast("Đã gửi mã OTP. Mã có hiệu lực trong 3 phút.", "success");
 
-      const userId = response.data.data.id;
-      router.replace({
-        pathname: "/(app)/auth/check-mail",
-        params: { userId, email },
+      router.push({
+        pathname: "/(app)/auth/verify-otp",
+        params: { email },
       });
-    } catch (err) {
-      showToast("Đăng kí thất bại", "error");
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Đăng ký thất bại";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,6 @@ export default function SignUp() {
       resizeMode="cover"
       className="flex-1"
     >
-      {/* overlay + gradient nhẹ */}
       <View className="absolute inset-0 bg-black/60" />
       <View
         className="absolute inset-0 opacity-70"
@@ -143,32 +142,30 @@ export default function SignUp() {
             <KeyboardAwareScrollView
               enableOnAndroid
               keyboardShouldPersistTaps="handled"
-              extraScrollHeight={80} // đẩy input cao thêm khi bàn phím mở
+              extraScrollHeight={80}
               contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
             >
-              {/* Logo */}
               <View className="mt-6 items-center">
                 <Text className="text-white/95 text-3xl font-extrabold tracking-tight">
                   CinemaGo
                 </Text>
               </View>
 
-              {/* Card */}
-              {/* Card */}
-              <View className="mt-5 w-full max-w-[560px] self-center rounded-2xl bg-white/95 p-6 shadow-2xl border border-yellow-400/40">
-                <Text className="text-2xl font-extrabold text-black text-center">
+              <View
+                className={`mt-5 w-full max-w-[560px] self-center rounded-2xl ${isDark ? "dark" : "light"} bg-background p-6 shadow-2xl border border-yellow-400/40`}
+              >
+                <Text className="text-2xl font-extrabold text-foreground text-center">
                   Đăng ký
                 </Text>
-                <Text className="text-black/60 mt-1 text-center">
+                <Text className="text-foreground mt-1 text-center">
                   Chỉ mất một phút để bắt đầu đặt vé!
                 </Text>
 
-                {/* Full Name */}
                 <View className="mt-6">
-                  <Text className="text-[14px] text-black/70 mb-2">
+                  <Text className="text-[14px] text-foreground mb-2">
                     Họ và tên
                   </Text>
-                  <View className="rounded-xl border border-black/10 bg-white">
+                  <View className="rounded-xl border border-foreground bg-white">
                     <TextInput
                       value={fullName}
                       onChangeText={setFullName}
@@ -182,10 +179,11 @@ export default function SignUp() {
                   )}
                 </View>
 
-                {/* Email */}
                 <View className="mt-4">
-                  <Text className="text-[14px] text-black/70 mb-2">Email</Text>
-                  <View className="rounded-xl border border-black/10 bg-white">
+                  <Text className="text-[14px] text-foreground mb-2">
+                    Email
+                  </Text>
+                  <View className="rounded-xl border border-foreground bg-white">
                     <TextInput
                       value={email}
                       onChangeText={setEmail}
@@ -203,9 +201,8 @@ export default function SignUp() {
                   )}
                 </View>
 
-                {/* Gender */}
                 <View className="mt-4">
-                  <Text className="text-[14px] text-black/70 mb-2">
+                  <Text className="text-[14px] text-foreground mb-2">
                     Giới tính
                   </Text>
 
@@ -232,9 +229,8 @@ export default function SignUp() {
                   </View>
                 </View>
 
-                {/* Password */}
                 <View className="mt-4">
-                  <Text className="text-[14px] text-black/70 mb-2">
+                  <Text className="text-[14px] text-foreground mb-2">
                     Mật khẩu
                   </Text>
                   <View className="flex-row items-center rounded-xl border border-black/10 bg-white">
@@ -260,9 +256,8 @@ export default function SignUp() {
                   )}
                 </View>
 
-                {/* Confirm Password */}
                 <View className="mt-4">
-                  <Text className="text-[14px] text-black/70 mb-2">
+                  <Text className="text-[14px] text-foreground mb-2">
                     Xác nhận mật khẩu
                   </Text>
                   <View className="flex-row items-center rounded-xl border border-black/10 bg-white">
@@ -288,7 +283,6 @@ export default function SignUp() {
                   )}
                 </View>
 
-                {/* Terms */}
                 <Pressable
                   onPress={() => setAcceptTos(!acceptTos)}
                   className="mt-5 flex-row items-center"
@@ -298,13 +292,13 @@ export default function SignUp() {
                   ${acceptTos ? "bg-[#eab308] border-[#eab308]" : "bg-white border-black/30"}`}
                   >
                     {acceptTos && (
-                      <Text className="text-black text-[12px] leading-4">
+                      <Text className="text-foreground text-[12px] leading-4">
                         ✓
                       </Text>
                     )}
                   </View>
 
-                  <Text className="text-black/75 text-[13px]">
+                  <Text className="text-foreground text-[13px]">
                     Tôi đồng ý với{" "}
                     <Link href="/legal/terms" className="text-[#2563eb]">
                       Điều khoản
@@ -317,7 +311,6 @@ export default function SignUp() {
                   </Text>
                 </Pressable>
 
-                {/* Submit */}
                 <Pressable
                   onPress={onSubmit}
                   disabled={!canSubmit}
@@ -331,9 +324,8 @@ export default function SignUp() {
                   </Text>
                 </Pressable>
 
-                {/* Switch */}
                 <View className="mt-6 flex-row justify-center">
-                  <Text className="text-black/60 mr-1">Đã có tài khoản?</Text>
+                  <Text className="text-foreground mr-1">Đã có tài khoản?</Text>
                   <Link
                     href="/(app)/auth/sign-in"
                     className="text-[#2563eb] font-medium"
@@ -343,7 +335,6 @@ export default function SignUp() {
                 </View>
               </View>
 
-              {/* Footer */}
               <View className="items-center mt-3">
                 <Text className="text-white/75 text-xs">
                   © {new Date().getFullYear()} CinemaGo

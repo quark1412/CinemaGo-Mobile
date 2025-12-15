@@ -1,7 +1,7 @@
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Text } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+
 import { useTheme } from "@/contexts/themeContext";
 
 export default function RootLayout() {

@@ -3,8 +3,9 @@ import { genreService } from "@/services/genre";
 import { movieService } from "@/services/movie";
 import type { Genre, GetMoviesParams, Movie } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   FlatList,
@@ -82,68 +83,69 @@ export default function SearchScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    let isCancelled = false;
-    const fetchMovies = async () => {
-      setIsLoading(true);
-      try {
-        const allMovies: Movie[] = [];
-        let page = 1;
-        let hasNextPage = true;
+  useFocusEffect(
+    useCallback(() => {
+      let isCancelled = false;
+      let timeoutId: NodeJS.Timeout | number;
 
-        while (hasNextPage && !isCancelled) {
-          const params: GetMoviesParams = {
-            page,
-            limit: 5,
-            search: keyword.trim() || undefined,
-          };
+      const fetchMovies = async () => {
+        setIsLoading(true);
+        try {
+          const allMovies: Movie[] = [];
+          let page = 1;
+          let hasNextPage = true;
 
-          if (appliedRating > 0) {
-            params.rating = appliedRating;
+          // Logic gọi API giữ nguyên
+          while (hasNextPage && !isCancelled) {
+            const params: GetMoviesParams = {
+              page,
+              limit: 5,
+              search: keyword.trim() || undefined,
+            };
+
+            if (appliedRating > 0) params.rating = appliedRating;
+            if (appliedStatus !== "all") params.status = appliedStatus;
+            if (appliedGenres.length > 0)
+              params.genreQuery = appliedGenres.join(",");
+
+            console.log("Call page:", page, params);
+
+            const res = await movieService.getAllMovies(params);
+            const data = res.data ?? [];
+            const pagination = res.pagination;
+
+            allMovies.push(...data);
+
+            if (!pagination || !pagination.hasNextPage) {
+              hasNextPage = false;
+            } else {
+              page = (pagination.currentPage ?? page) + 1;
+            }
           }
 
-          if (appliedStatus !== "all") {
-            params.status = appliedStatus;
+          if (!isCancelled) {
+            setMovies(allMovies);
           }
-
-          if (appliedGenres.length > 0) {
-            params.genreQuery = appliedGenres.join(",");
-          }
-
-          console.log("Call page:", page, params);
-
-          const res = await movieService.getAllMovies(params);
-          const data = res.data ?? [];
-          const pagination = res.pagination;
-
-          allMovies.push(...data);
-
-          // kiểm tra còn trang tiếp không
-          if (!pagination || !pagination.hasNextPage) {
-            hasNextPage = false;
-          } else {
-            // backend có thể normalize currentPage
-            page = (pagination.currentPage ?? page) + 1;
-          }
+        } catch (error) {
+          console.error("Lỗi tìm kiếm phim:", error);
+          if (!isCancelled) setMovies([]);
+        } finally {
+          if (!isCancelled) setIsLoading(false);
         }
+      };
 
-        if (!isCancelled) {
-          setMovies(allMovies);
-        }
-      } catch (error) {
-        console.error("Lỗi tìm kiếm phim:", error);
-        setMovies([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      // Debounce logic
+      timeoutId = setTimeout(() => {
+        fetchMovies();
+      }, 500);
 
-    const timeoutId = setTimeout(() => {
-      fetchMovies();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [keyword, appliedStatus, appliedRating, appliedGenres]);
+      // Cleanup function
+      return () => {
+        isCancelled = true;
+        clearTimeout(timeoutId);
+      };
+    }, [keyword, appliedStatus, appliedRating, appliedGenres])
+  );
 
   const toggleFilterPanel = () => {
     if (!showFilter) {
@@ -373,7 +375,7 @@ export default function SearchScreen() {
                     id={String(item.id)}
                     title={item.title}
                     poster={item.thumbnail}
-                    rating={item.rating || 1}
+                    rating={item.rating || 0}
                     genres={item.genres}
                     onPress={(id) =>
                       router.push({

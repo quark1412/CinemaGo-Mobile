@@ -46,8 +46,6 @@ export function ReviewItem({ data }: Props) {
   const avatarUrl = data.userDetail?.avatarUrl || "https://i.pravatar.cc/100";
   const userName = data.userDetail?.fullname || "Người dùng";
   const rating = data.rating ?? 0;
-  const ratingLabel =
-    rating >= 4 ? "Cực phẩm!" : rating >= 3 ? "Ổn áp" : "Có thể bỏ qua";
 
   const createdAtText = formatReviewDate(data.createdAt);
 
@@ -67,7 +65,6 @@ export function ReviewItem({ data }: Props) {
   };
 
   const textColor = isDark ? "text-white" : "text-slate-900";
-  const iconColor = isDark ? "#fff" : "#0f172a";
 
   return (
     <TouchableOpacity
@@ -101,7 +98,6 @@ export function ReviewItem({ data }: Props) {
           <Text className="text-orange-500 font-bold text-[14px]">
             ⭐ {rating}/5
           </Text>
-          <Text className="text-[11px] text-pink-500">{ratingLabel}</Text>
         </View>
       </View>
 
@@ -117,7 +113,7 @@ export function ReviewItem({ data }: Props) {
           <Text
             className="text-pink-600 font-medium text-[13px] mt-1"
             onPress={(e) => {
-              e.stopPropagation(); // tránh bấm "xem thêm" lại navigate
+              e.stopPropagation();
               setExpanded((p) => !p);
             }}
           >

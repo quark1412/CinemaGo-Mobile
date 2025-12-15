@@ -1,4 +1,5 @@
 import { authService } from "@/services/users/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
   createContext,
@@ -35,6 +36,40 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
+  const checkSession = async () => {
+    try {
+      setIsLoading(true);
+      // 1. Lấy Refresh Token từ storage
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+
+      if (refreshToken) {
+        // 2. Nếu có, gọi API làm mới token ngay lập tức
+        console.log("Phát hiện Refresh Token, đang khôi phục phiên...");
+        await authService.loginWithRefreshToken(refreshToken);
+
+        // 3. Sau khi refresh thành công, lấy thông tin profile
+        const userData = await authService.getProfile();
+        setUser(userData);
+        setIsAuthenticated(true);
+      } else {
+        // Không có token, coi như là khách
+        handleLogoutState();
+      }
+    } catch (error) {
+      console.log("Phiên đăng nhập hết hạn hoặc lỗi:", error);
+      // Nếu lỗi (refresh token hết hạn...), logout sạch sẽ
+      await handleLogoutState();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogoutState = async () => {
+    setUser(null);
+    setIsAuthenticated(false);
+    await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
+  };
+
   const fetchUserProfile = async () => {
     try {
       if (await authService.isAuthenticated()) {
@@ -67,13 +102,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await authService.logout();
-      setUser(null);
-      setIsAuthenticated(false);
-      router.replace("/(app)/auth/sign-in");
     } catch (error) {
       console.error("Logout error:", error);
-      setUser(null);
-      setIsAuthenticated(false);
+    } finally {
+      await handleLogoutState();
       router.replace("/(app)/auth/sign-in");
     }
   };
@@ -81,6 +113,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => {
     await fetchUserProfile();
   };
+
+  useEffect(() => {
+    checkSession();
+  }, []);
 
   useEffect(() => {
     fetchUserProfile();

@@ -51,11 +51,11 @@ function MovieItemCmp({
         />
 
         <View className={`p-2 ${cardBg}`}>
-          {!!rating && (
+          {(rating ?? 0) >= 0 && (
             <View className="flex-row items-center mb-1">
               <Ionicons name="star" size={14} color="#FFD700" />
               <Text className="ml-1 text-[13px] font-[bold] text-orange-500">
-                {rating.toFixed(1)}
+                {(rating ?? 0).toFixed(1)}
               </Text>
               {!!reviewCount && (
                 <Text className="text-gray-500 text-[12px]">

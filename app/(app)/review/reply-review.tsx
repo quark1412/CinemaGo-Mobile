@@ -478,11 +478,11 @@ export default function ReplyReviewScreen() {
               <Text className="text-gray-500 text-sm mb-4">
                 Trở thành người đầu tiên bình luận
               </Text>
-              <TouchableOpacity>
+              {/* <TouchableOpacity>
                 <Text className="text-pink-500 font-medium text-sm">
                   Xem thêm bình luận ▼
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           )}
         </ScrollView>

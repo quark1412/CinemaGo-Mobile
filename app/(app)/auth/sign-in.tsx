@@ -12,6 +12,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -27,15 +28,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
   const router = useRouter();
-  const { login, refreshUser } = useUser();
-  const { isDark, toggleTheme } = useTheme();
+  const {
+    login,
+    refreshUser,
+    isAuthenticated,
+    isLoading: isSessionLoading,
+  } = useUser();
+
+  const { isDark } = useTheme();
   const { showToast } = useToast();
+
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Biometrics state
   const [bioSupported, setBioSupported] = useState(false);
   const [bioLabel, setBioLabel] = useState<
     "Face ID" | "Touch ID" | "Biometric"
@@ -50,17 +57,16 @@ export default function SignIn() {
         if (compatible && enrolled) {
           const types =
             await LocalAuthentication.supportedAuthenticationTypesAsync();
-          // Ưu tiên Face ID nếu có, nếu không thì Touch ID
           if (
             types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
           ) {
-            setBioLabel("Touch ID"); // hoặc "Vân tay"
+            setBioLabel("Touch ID");
           } else if (
             types.includes(
               LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
             )
           ) {
-            setBioLabel("Face ID"); // hoặc "Khuôn mặt"
+            setBioLabel("Face ID");
           } else {
             setBioLabel("Biometric");
           }
@@ -73,6 +79,13 @@ export default function SignIn() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!isSessionLoading && isAuthenticated) {
+      // showToast("Chào mừng bạn quay lại!", "success"); // Optional
+      router.replace("/(app)/(tabs)/home");
+    }
+  }, [isSessionLoading, isAuthenticated]);
 
   const onSignIn = async () => {
     if (!email || !pwd) return;
@@ -110,10 +123,26 @@ export default function SignIn() {
       await disableBiometricLogin();
       await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
       showToast("Phiên sinh trắc học đã hết hạn, hãy đăng nhập lại.", "error");
-      router.replace("/auth/sign-in");
+      router.replace("/(app)/auth/sign-in");
       return;
     }
   };
+
+  if (isSessionLoading) {
+    return (
+      <ImageBackground
+        source={{
+          uri: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=1600&auto=format&fit=crop",
+        }}
+        resizeMode="cover"
+        className="flex-1 justify-center items-center"
+      >
+        <View className="absolute inset-0 bg-black/70" />
+        <ActivityIndicator size="large" color="#eab308" />
+        <Text className="text-white mt-4 font-medium">Đang khởi động...</Text>
+      </ImageBackground>
+    );
+  }
 
   return (
     <ImageBackground
@@ -147,7 +176,6 @@ export default function SignIn() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingHorizontal: 15, flexGrow: 1 }}
             >
-              {/* Logo */}
               <View className="mt-10 items-center">
                 <Text className="text-white/95 text-3xl font-extrabold tracking-tight">
                   CinemaGo
@@ -157,11 +185,9 @@ export default function SignIn() {
                 </Text>
               </View>
 
-              {/* Card */}
               <View
                 className={`mt-10  rounded-2xl ${isDark ? "dark" : "light"} bg-background p-5 shadow-2xl border border-yellow-400/40`}
               >
-                {/* Title center */}
                 <Text className="text-2xl font-extrabold text-foreground text-center">
                   Đăng nhập
                 </Text>
@@ -169,7 +195,6 @@ export default function SignIn() {
                   Chào mừng trở lại!
                 </Text>
 
-                {/* Email */}
                 <View className="mt-6">
                   <Text className="text-[13px] text-foreground mb-2">
                     Tên đăng nhập
@@ -189,7 +214,6 @@ export default function SignIn() {
                   </View>
                 </View>
 
-                {/* Password */}
                 <View className="mt-4">
                   <Text className="text-[13px] text-foreground mb-2">
                     Mật khẩu
@@ -219,7 +243,6 @@ export default function SignIn() {
                   </View>
                 </View>
 
-                {/* Actions */}
                 <View className="mt-5 flex-row items-center justify-between">
                   <Link
                     href="/(app)/auth/forgot-password"
@@ -229,7 +252,6 @@ export default function SignIn() {
                   </Link>
                 </View>
 
-                {/* Nút đăng nhập chính */}
                 <Pressable
                   onPress={onSignIn}
                   disabled={loading || !email || !pwd}
@@ -244,7 +266,6 @@ export default function SignIn() {
                   </Text>
                 </Pressable>
 
-                {/* Divider */}
                 <View className="flex-row items-center mt-6">
                   <View
                     className={`h-px flex-1 ${isDark ? "dark" : "light"} bg-background`}
@@ -255,7 +276,6 @@ export default function SignIn() {
                   />
                 </View>
 
-                {/* Biometric sign-in */}
                 {!checkingBio && bioSupported && (
                   <Pressable
                     onPress={onBiometric}
@@ -272,7 +292,6 @@ export default function SignIn() {
                   </Text>
                 )}
 
-                {/* Đăng ký */}
                 <View className="mt-6 flex-row justify-center">
                   <Text className="text-foreground  mr-1">
                     Bạn chưa có tài khoản?
@@ -287,7 +306,6 @@ export default function SignIn() {
               </View>
             </ScrollView>
           </TouchableWithoutFeedback>
-          {/* Footer */}
           <View className="items-center mt-6">
             <Text className="text-white/75 text-xs">
               © {new Date().getFullYear()} CinemaGo

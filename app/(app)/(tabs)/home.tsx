@@ -2,8 +2,9 @@ import { useTheme } from "@/contexts/themeContext";
 import { movieService } from "@/services/movie";
 import type { Movie } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import {
   ActivityIndicator,
   Animated,
@@ -32,79 +33,87 @@ export default function Home() {
   const [nowShowingMovies, setNowShowingMovies] = useState<Movie[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    let isCancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let isCancelled = false;
 
-    const fetchNowShowingMovies = async () => {
-      try {
-        setIsLoading(true);
+      const fetchData = async () => {
+        // Chỉ hiện loading lần đầu tiên hoặc khi chưa có data
+        if (featuredMovies.length === 0) setIsLoading(true);
 
-        const all: Movie[] = [];
-        let page = 1;
-        const limit = 20;
-        let hasNextPage = true;
+        try {
+          // --- Logic gọi API giữ nguyên ---
+          const topRatedPromise = movieService.getTopRatedMovies({ limit: 5 });
 
-        while (hasNextPage && !isCancelled) {
-          const res = await movieService.getAllMovies({
-            page,
-            limit,
-            status: "NOW_SHOWING",
-          });
+          const fetchAllNowShowing = async () => {
+            const allResults: Movie[] = [];
+            let page = 1;
+            const limit = 10;
+            let hasNextPage = true;
 
-          const data = (res.data ?? []) as Movie[];
-          const pagination = res.pagination;
+            while (hasNextPage && !isCancelled) {
+              const res = await movieService.getAllMovies({
+                page,
+                limit,
+                status: "NOW_SHOWING",
+              });
+              const data = (res.data ?? []) as Movie[];
+              const pagination = res.pagination;
+              allResults.push(...data);
+              if (!pagination || !pagination.hasNextPage) {
+                hasNextPage = false;
+              } else {
+                page = (pagination.currentPage ?? page) + 1;
+              }
+            }
+            return allResults;
+          };
 
-          all.push(...data);
+          const [topRatedRes, allNowShowingMovies] = await Promise.all([
+            topRatedPromise,
+            fetchAllNowShowing(),
+          ]);
 
-          if (!pagination || !pagination.hasNextPage) {
-            hasNextPage = false;
-          } else {
-            page = (pagination.currentPage ?? page) + 1;
+          if (isCancelled) return;
+
+          const topRatedIds = new Set(topRatedRes.map((m: Movie) => m.id));
+          let remainingMovies = allNowShowingMovies.filter(
+            (m) => !topRatedIds.has(m.id)
+          );
+
+          if (remainingMovies.length === 0) {
+            remainingMovies = topRatedRes;
           }
+
+          setFeaturedMovies(topRatedRes);
+          setNowShowingMovies(remainingMovies);
+        } catch (e) {
+          console.error("Lỗi tải dữ liệu Home:", e);
+        } finally {
+          if (!isCancelled) setIsLoading(false);
         }
+      };
 
-        if (isCancelled) return;
+      fetchData();
 
-        const sorted = [...all].sort(
-          (a, b) => (b.rating ?? 0) - (a.rating ?? 0)
-        );
-
-        const featured = sorted.slice(0, 5);
-        let remaining = sorted.slice(5);
-
-        if (remaining.length === 0) {
-          remaining = featured;
-        }
-
-        setFeaturedMovies(featured);
-        setNowShowingMovies(remaining);
-      } catch (e) {
-        console.error("Lỗi tải phim NOW_SHOWING:", e);
-        if (!isCancelled) {
-          setFeaturedMovies([]);
-          setNowShowingMovies([]);
-        }
-      } finally {
-        if (!isCancelled) setIsLoading(false);
-      }
-    };
-
-    fetchNowShowingMovies();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
+      return () => {
+        isCancelled = true;
+      };
+    }, [])
+  );
 
   const x = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
 
-  const LOOP_DATA = featuredMovies.length
-    ? [...featuredMovies, ...featuredMovies, ...featuredMovies]
-    : [];
-  const START_INDEX = featuredMovies.length;
-  const ITEM_SIZE = CARD_W + SPACING;
+  const shouldLoop = featuredMovies.length > 1;
 
+  const LOOP_DATA = shouldLoop
+    ? [...featuredMovies, ...featuredMovies, ...featuredMovies]
+    : featuredMovies;
+
+  const START_INDEX = shouldLoop ? featuredMovies.length : 0;
+
+  const ITEM_SIZE = CARD_W + SPACING;
   const indexRef = useRef(START_INDEX);
 
   function goSearch() {
@@ -112,44 +121,41 @@ export default function Home() {
   }
 
   const scrollToMiddle = useCallback(() => {
-    if (!featuredMovies.length) return;
+    if (!shouldLoop || !flatListRef.current) return;
 
-    flatListRef.current?.scrollToOffset({
+    flatListRef.current.scrollToOffset({
       offset: START_INDEX * ITEM_SIZE,
       animated: false,
     });
-  }, [ITEM_SIZE, START_INDEX, featuredMovies.length]);
+  }, [ITEM_SIZE, START_INDEX, shouldLoop]);
+
+  useEffect(() => {
+    if (shouldLoop && featuredMovies.length > 0) {
+      scrollToMiddle();
+    }
+  }, [featuredMovies, shouldLoop, scrollToMiddle]);
 
   useEffect(() => {
     scrollToMiddle();
   }, [scrollToMiddle]);
 
   const onMomentumScrollEnd = (event: any) => {
-    if (!featuredMovies.length) return;
+    if (!shouldLoop) return;
+
     const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / ITEM_SIZE);
 
-    let index = Math.round(offsetX / ITEM_SIZE);
-    indexRef.current = index;
+    const baseIndex = index % featuredMovies.length;
 
-    flatListRef.current?.scrollToOffset({
-      offset: index * ITEM_SIZE,
-      animated: true,
-    });
+    const newIndex = START_INDEX + baseIndex;
 
-    setTimeout(() => {
-      const baseIndex =
-        ((index % featuredMovies.length) + featuredMovies.length) %
-        featuredMovies.length;
-      const newIndex = START_INDEX + baseIndex;
-
-      if (newIndex !== index) {
-        flatListRef.current?.scrollToOffset({
-          offset: newIndex * ITEM_SIZE,
-          animated: false,
-        });
-        indexRef.current = newIndex;
-      }
-    }, 50);
+    if (index !== newIndex) {
+      flatListRef.current?.scrollToOffset({
+        offset: newIndex * ITEM_SIZE,
+        animated: false,
+      });
+      indexRef.current = newIndex;
+    }
   };
 
   const renderFeatured = ({ item, index }: { item: Movie; index: number }) => {
@@ -175,7 +181,9 @@ export default function Home() {
     const thumbnail = (item as any).poster ?? (item as any).thumbnail;
     const genreText = Array.isArray((item as any).genres)
       ? (item as any).genres.map((g: any) => g.name).join(", ")
-      : (item as any).genre ?? "";
+      : ((item as any).genre ?? "");
+
+    const ratingVal = item.rating || 0;
     return (
       <TouchableOpacity
         onPress={() =>
@@ -208,6 +216,13 @@ export default function Home() {
               style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
             />
+
+            <View className="absolute top-2 right-2 flex-row items-center bg-black/60 px-2 py-1 rounded-lg backdrop-blur-md">
+              <Ionicons name="star" size={14} color="#FFD700" />
+              <Text className="text-white font-bold ml-1 text-xs">
+                {ratingVal.toFixed(1)}
+              </Text>
+            </View>
 
             <Text
               className="absolute bottom-2 left-3 text-white font-extrabold"
@@ -242,11 +257,11 @@ export default function Home() {
 
   const renderNowShowing = ({ item }: { item: Movie }) => {
     const rating = item.rating ?? 0;
-    const reviews = (item as any).reviewCount ?? (item as any).reviews ?? 0;
+
     const thumbnail = (item as any).poster ?? (item as any).thumbnail;
     const genreText = Array.isArray((item as any).genres)
       ? (item as any).genres.map((g: any) => g.name).join(", ")
-      : (item as any).genre ?? "";
+      : ((item as any).genre ?? "");
 
     return (
       <TouchableOpacity
@@ -278,7 +293,6 @@ export default function Home() {
             <Text className="text-[13px] font-semibold text-orange-500">
               ⭐ {rating.toFixed(1)}
             </Text>
-            <Text className="text-[12px] text-gray-500 ml-1">({reviews})</Text>
           </View>
 
           <Text
@@ -374,9 +388,11 @@ export default function Home() {
 
           <Animated.FlatList
             ref={flatListRef}
-            onLayout={scrollToMiddle}
+            // onLayout={scrollToMiddle}
             data={LOOP_DATA}
-            keyExtractor={(_, i) => String(i)}
+            // keyExtractor={(_, i) => String(i)}
+
+            keyExtractor={(item, index) => `${item.id}-loop-${index}`}
             renderItem={renderFeatured}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -384,6 +400,8 @@ export default function Home() {
             snapToInterval={ITEM_SIZE}
             snapToAlignment="center"
             bounces={false}
+            scrollEventThrottle={16}
+            //
             contentContainerStyle={{
               paddingHorizontal: (width - CARD_W) / 2,
             }}
@@ -392,7 +410,6 @@ export default function Home() {
               { useNativeDriver: true }
             )}
             onMomentumScrollEnd={onMomentumScrollEnd}
-            scrollEventThrottle={16}
           />
 
           <View className="px-4 mt-5 mb-3 flex-row justify-between items-center">
