@@ -28,14 +28,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SignIn() {
   const router = useRouter();
-  const { login, refreshUser, isAuthenticated } = useUser();
+  const {
+    login,
+    refreshUser,
+    isAuthenticated,
+    isLoading: isSessionLoading,
+  } = useUser();
+
   const { isDark } = useTheme();
   const { showToast } = useToast();
+
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   // Biometrics state
   const [bioSupported, setBioSupported] = useState(false);
@@ -75,32 +81,38 @@ export default function SignIn() {
     })();
   }, []);
 
+  // useEffect(() => {
+  //   const checkAutoLogin = async () => {
+  //     try {
+  //       const refreshToken = await AsyncStorage.getItem("refreshToken");
+
+  //       if (refreshToken) {
+  //         console.log("Phát hiện Refresh Token, đang thử khôi phục phiên...");
+
+  //         await authService.loginWithRefreshToken(refreshToken);
+
+  //         await refreshUser();
+
+  //         showToast("Chào mừng bạn quay lại!", "success");
+  //         router.replace("/(app)/(tabs)/home");
+  //         return;
+  //       }
+  //     } catch (error) {
+  //       console.log("Phiên đăng nhập đã hết hạn hoặc lỗi:", error);
+  //       await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
+  //     } finally {
+  //       setIsCheckingSession(false);
+  //     }
+  //   };
+
+  //   checkAutoLogin();
+  // }, []);
   useEffect(() => {
-    const checkAutoLogin = async () => {
-      try {
-        const refreshToken = await AsyncStorage.getItem("refreshToken");
-
-        if (refreshToken) {
-          console.log("Phát hiện Refresh Token, đang thử khôi phục phiên...");
-
-          await authService.loginWithRefreshToken(refreshToken);
-
-          await refreshUser();
-
-          showToast("Chào mừng bạn quay lại!", "success");
-          router.replace("/(app)/(tabs)/home");
-          return;
-        }
-      } catch (error) {
-        console.log("Phiên đăng nhập đã hết hạn hoặc lỗi:", error);
-        await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
-      } finally {
-        setIsCheckingSession(false);
-      }
-    };
-
-    checkAutoLogin();
-  }, []);
+    if (!isSessionLoading && isAuthenticated) {
+      // showToast("Chào mừng bạn quay lại!", "success"); // Optional
+      router.replace("/(app)/(tabs)/home");
+    }
+  }, [isSessionLoading, isAuthenticated]);
 
   const onSignIn = async () => {
     if (!email || !pwd) return;
@@ -143,7 +155,7 @@ export default function SignIn() {
     }
   };
 
-  if (isCheckingSession) {
+  if (isSessionLoading) {
     return (
       <ImageBackground
         source={{
@@ -154,9 +166,7 @@ export default function SignIn() {
       >
         <View className="absolute inset-0 bg-black/70" />
         <ActivityIndicator size="large" color="#eab308" />
-        <Text className="text-white mt-4 font-medium">
-          Đang kiểm tra phiên đăng nhập...
-        </Text>
+        <Text className="text-white mt-4 font-medium">Đang khởi động...</Text>
       </ImageBackground>
     );
   }

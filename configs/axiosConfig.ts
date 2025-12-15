@@ -27,6 +27,7 @@ instance.interceptors.request.use(
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       const refreshToken = await AsyncStorage.getItem("refreshToken");
+      console.log(accessToken, refreshToken);
 
       const requiresAuth = req.requiresAuth !== false;
 
