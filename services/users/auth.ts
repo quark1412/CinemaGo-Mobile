@@ -54,7 +54,8 @@ export const authService = {
     email: string,
     fullname: string,
     password: string,
-    gender: string
+    gender: string,
+    device: string
   ) => {
     try {
       const response = await instance.post(`/auth/signup`, {
@@ -62,6 +63,7 @@ export const authService = {
         fullname,
         password,
         gender,
+        device,
       });
       return response.data;
     } catch (error) {
@@ -137,9 +139,9 @@ export const authService = {
     return !!(accessToken || refreshToken);
   },
 
-  sendVerificationEmail: async (email: string) => {
+  forgotPassword: async (email: string) => {
     try {
-      const response = await instance.post(`/auth/send-verification-link`, {
+      const response = await instance.post(`/auth/forgot-password`, {
         email,
       });
       return response.data;
@@ -148,12 +150,22 @@ export const authService = {
     }
   },
 
-  verifyAccountByLink: async (userId: string, token: string) => {
+  resetPassword: async (data: {
+    email: string;
+    otp: string;
+    newPassword: string;
+  }) => {
     try {
-      const response = await instance.post(`/auth/verify-account-by-link`, {
-        userId,
-        token,
-      });
+      const response = await instance.post(`/auth/reset-password`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  verifyOTP: async (email: string, otp: string) => {
+    try {
+      const response = await instance.post(`/auth/verify-otp`, { email, otp });
       return response.data;
     } catch (error) {
       throw error;

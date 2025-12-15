@@ -19,7 +19,7 @@ import {
 export default function Account() {
   const { showToast } = useToast();
   const { toggleTheme, isDark } = useTheme();
-  const { user } = useUser();
+  const { user, logout } = useUser();
 
   const [bioSupported, setBioSupported] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
@@ -71,9 +71,7 @@ export default function Account() {
   };
 
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove(["user", "accessToken", "refreshToken"]);
-
-    router.replace("/auth/sign-in");
+    logout();
   };
 
   return (
