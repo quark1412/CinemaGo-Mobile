@@ -39,25 +39,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const checkSession = async () => {
     try {
       setIsLoading(true);
-      // 1. Lấy Refresh Token từ storage
       const refreshToken = await AsyncStorage.getItem("refreshToken");
 
       if (refreshToken) {
-        // 2. Nếu có, gọi API làm mới token ngay lập tức
         console.log("Phát hiện Refresh Token, đang khôi phục phiên...");
         await authService.loginWithRefreshToken(refreshToken);
 
-        // 3. Sau khi refresh thành công, lấy thông tin profile
         const userData = await authService.getProfile();
         setUser(userData);
         setIsAuthenticated(true);
       } else {
-        // Không có token, coi như là khách
         handleLogoutState();
       }
     } catch (error) {
       console.log("Phiên đăng nhập hết hạn hoặc lỗi:", error);
-      // Nếu lỗi (refresh token hết hạn...), logout sạch sẽ
       await handleLogoutState();
     } finally {
       setIsLoading(false);
@@ -74,15 +69,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       if (await authService.isAuthenticated()) {
         const userData = await authService.getProfile();
-        setUser(userData);
 
+        setUser(userData);
         setIsAuthenticated(true);
+        return userData;
       } else {
         setUser(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
+      await authService.logout();
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -93,8 +90,16 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       await authService.login(email, password);
-      await fetchUserProfile();
+      const userData = await authService.getProfile();
+
+      if (userData.role === "ADMIN") {
+        await authService.logout();
+
+        throw new Error("Tài khoản quản lý không được truy cập.");
+      }
     } catch (error) {
+      setUser(null);
+      setIsAuthenticated(false);
       throw error;
     }
   };
