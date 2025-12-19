@@ -13,6 +13,7 @@ export interface Payment {
 
 export interface PaymentResponse {
   URL: string;
+  paymentId?: string;
 }
 
 export const paymentService = {
@@ -82,9 +83,8 @@ export const paymentService = {
 
       return response.data.data;
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to check payment status"
-      );
+      // Re-throw original error so callers can inspect HTTP status codes
+      throw error;
     }
   },
 

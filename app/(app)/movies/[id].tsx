@@ -480,7 +480,10 @@ export default function MovieDetail() {
             <TouchableOpacity
               className="bg-pink-600 rounded-xl py-3"
               onPress={() => {
-                // TODO: navigate to booking
+                router.push({
+                  pathname: "/movies/[id]/showtime-selection",
+                  params: { id: movie.id },
+                });
               }}
             >
               <Text className="text-center text-white font-semibold text-[16px]">

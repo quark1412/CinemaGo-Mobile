@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { useState, useEffect } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { generateBookingQRData } from "@/utils/qrCodeHelpers";
-import { getShowtimeById } from "@/services/showtime";
+import { showTimeService } from "@/services/showtime";
 
 interface TicketProps {
   booking: Booking;
@@ -39,15 +39,17 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
     const fetchTicketData = async () => {
       try {
         // Fetch showtime details using the real API
-        const showtimeDetails = await getShowtimeById(booking.showtimeId);
+        const showtimeDetails = await showTimeService.getShowTimeById(
+          booking.showtimeId
+        );
 
         setShowtimeData({
           id: booking.showtimeId,
-          movieTitle: showtimeDetails.data.movie?.title || "Movie Title",
-          cinemaName: showtimeDetails.data.cinema?.name || "CinemaGo Cinema",
-          roomName: showtimeDetails.data.room?.name || "Theater Room",
-          startTime: showtimeDetails.data.startTime,
-          date: formatDate(showtimeDetails.data.startTime),
+          movieTitle: showtimeDetails.movie?.title || "Movie Title",
+          cinemaName: showtimeDetails.cinema?.name || "CinemaGo Cinema",
+          roomName: showtimeDetails.room?.name || "Theater Room",
+          startTime: showtimeDetails.startTime,
+          date: formatDate(showtimeDetails.startTime),
           price: booking.totalPrice / booking.bookingSeats.length,
         });
 

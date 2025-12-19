@@ -1,6 +1,13 @@
 import axiosConfig from "@/configs/axiosConfig";
 import { Booking } from "@/types/booking";
 
+export interface HeldSeat {
+  userId: string;
+  showtimeId: string;
+  seatId: string;
+  extraPrice: number;
+}
+
 export const bookingService = {
   // Get all bookings for the current user
   getMyBookings: async (page: number = 1, limit: number = 10) => {
@@ -64,10 +71,18 @@ export const bookingService = {
     foodDrinks?: Array<{ id: string; quantity: number }>
   ) => {
     try {
+      const foodDrinksData = foodDrinks
+        ? foodDrinks.map((fd) => ({
+            foodDrinkId: fd.id,
+            quantity: fd.quantity,
+          }))
+        : undefined;
+
       const response = await axiosConfig.post(`/bookings`, {
+        type: "online",
         showtimeId,
         seatIds,
-        foodDrinks: foodDrinks || [],
+        foodDrinks: foodDrinksData,
       });
 
       // Transform the response data to ensure dates are properly converted
@@ -101,6 +116,44 @@ export const bookingService = {
       throw new Error(
         error.response?.data?.message || "Failed to fetch booked seats"
       );
+    }
+  },
+
+  // Hold a seat temporarily for the current user
+  holdSeat: async (data: {
+    showtimeId: string;
+    seatId: string;
+  }): Promise<{ message: string }> => {
+    try {
+      const response = await axiosConfig.post(`/rooms/hold-seat`, data, {
+        requiresAuth: true,
+      } as any);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  // Release a previously held seat
+  releaseSeat: async (data: {
+    showtimeId: string;
+    seatId: string;
+  }): Promise<{ message: string }> => {
+    try {
+      const response = await axiosConfig.post(`/rooms/release-seat`, data);
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  // Get all held seats for a showtime
+  getHeldSeats: async (showtimeId: string): Promise<HeldSeat[]> => {
+    try {
+      const response = await axiosConfig.get(`/rooms/${showtimeId}/hold-seat`);
+      return response.data.data as HeldSeat[];
+    } catch (error: any) {
+      throw error;
     }
   },
 };

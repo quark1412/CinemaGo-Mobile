@@ -8,6 +8,7 @@ import {
   Image,
   Linking,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,23 +19,31 @@ import { fooddrinkService, FoodDrink } from "@/services/fooddrink";
 import { useToast } from "@/contexts/toastContext";
 import { useTheme } from "@/contexts/themeContext";
 
-type PaymentMethod = "MOMO" | "VNPAY" | "ZALOPAY";
+type PaymentMethod = "COD" | "MOMO";
 
-const TRANSACTION_TIMEOUT_MINUTES = 10;
+const TRANSACTION_TIMEOUT_MINUTES = 5;
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const { showToast } = useToast();
   const { isDark } = useTheme();
-  const { showtimeId, movieId, seats, seatIds, foodDrinks, totalPrice } =
-    useLocalSearchParams<{
-      showtimeId: string;
-      movieId: string;
-      seats: string;
-      seatIds: string;
-      foodDrinks: string;
-      totalPrice: string;
-    }>();
+  const {
+    showtimeId,
+    movieId,
+    seats,
+    seatIds,
+    seatDetails,
+    foodDrinks,
+    totalPrice,
+  } = useLocalSearchParams<{
+    showtimeId: string;
+    movieId: string;
+    seats: string;
+    seatIds: string;
+    seatDetails: string;
+    foodDrinks: string;
+    totalPrice: string;
+  }>();
 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -46,7 +55,7 @@ export default function CheckoutScreen() {
     Record<string, number>
   >({});
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
-    useState<PaymentMethod>("MOMO");
+    useState<PaymentMethod>("COD");
   const [timeRemaining, setTimeRemaining] = useState({
     minutes: TRANSACTION_TIMEOUT_MINUTES,
     seconds: 0,
@@ -54,6 +63,7 @@ export default function CheckoutScreen() {
   const [bookingId, setBookingId] = useState<string | null>(null);
 
   const selectedSeats = seats ? JSON.parse(seats) : [];
+  const seatDetailsData = seatDetails ? JSON.parse(seatDetails) : [];
   const foodDrinkData = foodDrinks ? JSON.parse(foodDrinks) : [];
   const totalAmount = totalPrice ? parseFloat(totalPrice) : 0;
 
@@ -158,40 +168,38 @@ export default function CheckoutScreen() {
     try {
       setProcessing(true);
 
-      let paymentUrl: string;
-
       switch (selectedPaymentMethod) {
-        case "MOMO":
+        case "COD": {
+          router.push("/booking/success" as any);
+          return;
+        }
+        case "MOMO": {
           const momoResponse = await paymentService.checkoutWithMoMo(
             totalAmount,
             bookingId
           );
-          paymentUrl = momoResponse.URL;
-          break;
-        case "VNPAY":
-          const vnpayResponse = await paymentService.checkoutWithVnPay(
-            totalAmount,
-            bookingId
-          );
-          paymentUrl = vnpayResponse.URL;
-          break;
-        case "ZALOPAY":
-          const zalopayResponse = await paymentService.checkoutWithZaloPay(
-            totalAmount,
-            bookingId
-          );
-          paymentUrl = zalopayResponse.URL;
-          break;
-        default:
-          throw new Error("Invalid payment method");
-      }
 
-      const supported = await Linking.canOpenURL(paymentUrl);
-      if (supported) {
-        await Linking.openURL(paymentUrl);
-        // router.push("/booking/success");
-      } else {
-        showToast("Không thể mở trang thanh toán", "error");
+          const paymentUrl = momoResponse.URL;
+
+          try {
+            if (momoResponse.paymentId) {
+              await AsyncStorage.setItem("paymentId", momoResponse.paymentId);
+            }
+            if (bookingId) {
+              await AsyncStorage.setItem("bookingId", bookingId);
+            }
+          } catch (storageError) {
+            console.warn("Failed to persist payment identifiers", storageError);
+          }
+
+          const supported = await Linking.canOpenURL(paymentUrl);
+          if (supported) {
+            await Linking.openURL(paymentUrl);
+          } else {
+            showToast("Không thể mở trang thanh toán", "error");
+          }
+          return;
+        }
       }
     } catch (error: any) {
       showToast(error.message || "Failed to process payment", "error");
@@ -207,15 +215,32 @@ export default function CheckoutScreen() {
     };
   };
 
+  // Calculate ticket price with extraPrice for VIP and couple seats
   const ticketPrice = useMemo(() => {
-    return (
-      totalAmount -
-      selectedFoodDrinks.reduce((sum, fd) => {
-        const quantity = foodDrinkQuantities[fd.id] || 0;
-        return sum + fd.price * quantity;
-      }, 0)
-    );
-  }, [totalAmount, selectedFoodDrinks, foodDrinkQuantities]);
+    if (!showtime) return 0;
+
+    const basePrice = showtime.price || 0;
+    let totalSeatPrice = 0;
+
+    seatDetailsData.forEach((seat: any) => {
+      const seatPrice = basePrice + (seat.extraPrice || 0);
+      if (seat.isCoupleSeat) {
+        totalSeatPrice += seatPrice * 2;
+      } else {
+        totalSeatPrice += seatPrice;
+      }
+    });
+
+    return totalSeatPrice;
+  }, [showtime, seatDetailsData]);
+
+  // Calculate food/drinks total
+  const foodDrinksTotal = useMemo(() => {
+    return selectedFoodDrinks.reduce((sum, fd) => {
+      const quantity = foodDrinkQuantities[fd.id] || 0;
+      return sum + fd.price * quantity;
+    }, 0);
+  }, [selectedFoodDrinks, foodDrinkQuantities]);
 
   // Theme-aware colors
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
@@ -320,34 +345,162 @@ export default function CheckoutScreen() {
                 {selectedSeats.join(", ")}
               </Text>
             </View>
-            <View className="flex-row justify-between mb-3">
-              <Text className={`${textMuted} text-sm`}>
-                Vé xem phim ({selectedSeats.length})
-              </Text>
-              <Text className={`${textColor} font-semibold`}>
-                {new Intl.NumberFormat("vi-VN", {
-                  style: "currency",
-                  currency: "VND",
-                }).format(ticketPrice)}
-              </Text>
-            </View>
-            {selectedFoodDrinks.map((fd) => {
-              const quantity = foodDrinkQuantities[fd.id] || 0;
-              if (quantity === 0) return null;
-              return (
-                <View key={fd.id} className="flex-row justify-between mb-3">
+
+            {/* Seat breakdown with extraPrice */}
+            {seatDetailsData.length > 0 && showtime && (
+              <>
+                {seatDetailsData.map((seat: any, index: number) => {
+                  const basePrice = showtime.price || 0;
+                  const extraPrice = seat.extraPrice || 0;
+                  const isCouple = seat.isCoupleSeat;
+
+                  const seatPricePerSeat = basePrice + extraPrice;
+                  const totalSeatPrice = isCouple
+                    ? seatPricePerSeat * 2
+                    : seatPricePerSeat;
+
+                  return (
+                    <View key={index} className="mb-2">
+                      <View className="flex-row justify-between mb-1">
+                        <Text className={`${textMuted} text-sm`}>
+                          Ghế {seat.seatNumber}
+                          {seat.type === "VIP" && " (VIP)"}
+                          {isCouple && " (Đôi - 2 ghế)"}
+                        </Text>
+                        <Text className={`${textColor} font-semibold text-sm`}>
+                          {new Intl.NumberFormat("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          }).format(totalSeatPrice)}
+                        </Text>
+                      </View>
+                      {isCouple ? (
+                        <>
+                          <View className="flex-row justify-between ml-4 mb-1">
+                            <Text className={`${textMuted} text-xs`}>
+                              - Giá vé/ghế:{" "}
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              }).format(basePrice)}{" "}
+                              x 2
+                            </Text>
+                            <Text className={`${textMuted} text-xs`}>
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              }).format(basePrice * 2)}
+                            </Text>
+                          </View>
+                          {extraPrice > 0 && (
+                            <View className="flex-row justify-between ml-4 mb-1">
+                              <Text className={`${textMuted} text-xs`}>
+                                - Phụ thu/ghế:{" "}
+                                {new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(extraPrice)}{" "}
+                                x 2
+                              </Text>
+                              <Text className={`${textMuted} text-xs`}>
+                                {new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(extraPrice * 2)}
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <View className="flex-row justify-between ml-4 mb-1">
+                            <Text className={`${textMuted} text-xs`}>
+                              - Giá vé:{" "}
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              }).format(basePrice)}
+                            </Text>
+                          </View>
+                          {extraPrice > 0 && (
+                            <View className="flex-row justify-between ml-4 mb-1">
+                              <Text className={`${textMuted} text-xs`}>
+                                - Phụ thu:{" "}
+                                {new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(extraPrice)}
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+                <View className="flex-row justify-between mt-2 mb-3 pt-2 border-t border-slate-600/30">
                   <Text className={`${textMuted} text-sm`}>
-                    {fd.name} ({quantity})
+                    Tổng vé xem phim ({selectedSeats.length})
                   </Text>
                   <Text className={`${textColor} font-semibold`}>
                     {new Intl.NumberFormat("vi-VN", {
                       style: "currency",
                       currency: "VND",
-                    }).format(fd.price * quantity)}
+                    }).format(ticketPrice)}
                   </Text>
                 </View>
-              );
-            })}
+              </>
+            )}
+
+            {/* Food/Drinks section */}
+            {selectedFoodDrinks.length > 0 && foodDrinkQuantities && (
+              <View className="mb-3 pt-2 border-t border-slate-600/30">
+                <Text className={`${textMuted} text-sm mb-2 font-semibold`}>
+                  Bắp nước
+                </Text>
+                {selectedFoodDrinks.map((fd) => {
+                  const quantity = foodDrinkQuantities[fd.id] || 0;
+                  if (quantity === 0) return null;
+                  return (
+                    <View key={fd.id} className="flex-row items-center mb-2">
+                      <Image
+                        source={{ uri: fd.image }}
+                        className="w-12 h-12 rounded-lg mr-3"
+                        resizeMode="cover"
+                      />
+                      <View className="flex-1">
+                        <Text className={`${textColor} text-sm font-medium`}>
+                          {fd.name}
+                        </Text>
+                        <Text className={`${textMuted} text-xs`}>
+                          {quantity} x{" "}
+                          {new Intl.NumberFormat("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          }).format(fd.price)}
+                        </Text>
+                      </View>
+                      <Text className={`${textColor} font-semibold`}>
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(fd.price * quantity)}
+                      </Text>
+                    </View>
+                  );
+                })}
+                <View className="flex-row justify-between mt-2 pt-2 border-t border-slate-600/30">
+                  <Text className={`${textMuted} text-sm`}>Tổng bắp nước</Text>
+                  <Text className={`${textColor} font-semibold`}>
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(foodDrinksTotal)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View
               className={`flex-row justify-between mt-4 pt-4 border-t ${borderColorLight}`}
             >
@@ -370,6 +523,47 @@ export default function CheckoutScreen() {
             Chọn phương thức thanh toán
           </Text>
 
+          {/* COD */}
+          <TouchableOpacity
+            className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
+              selectedPaymentMethod === "COD"
+                ? `${cardBg} border-red-600`
+                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
+            }`}
+            onPress={() => setSelectedPaymentMethod("COD")}
+          >
+            <View className="flex-row items-center gap-3">
+              <View
+                className={`w-10 h-10 ${
+                  isDark ? "bg-slate-700" : "bg-slate-400"
+                } rounded-lg items-center justify-center`}
+              >
+                <Ionicons name="cash-outline" size={20} color="#fff" />
+              </View>
+              <View>
+                <Text className={`${textColor} font-semibold`}>
+                  Thanh toán tại quầy (COD)
+                </Text>
+                <Text className={`${textMuted} text-xs mt-1`}>
+                  Thanh toán trực tiếp tại rạp
+                </Text>
+              </View>
+            </View>
+            <View
+              className={`w-5 h-5 rounded-full border-2 ${
+                selectedPaymentMethod === "COD"
+                  ? "border-red-600 bg-red-600"
+                  : isDark
+                    ? "border-slate-600"
+                    : "border-slate-400"
+              }`}
+            >
+              {selectedPaymentMethod === "COD" && (
+                <View className="w-full h-full rounded-full bg-red-600" />
+              )}
+            </View>
+          </TouchableOpacity>
+
           {/* MoMo */}
           <TouchableOpacity
             className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
@@ -380,10 +574,17 @@ export default function CheckoutScreen() {
             onPress={() => setSelectedPaymentMethod("MOMO")}
           >
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 bg-green-600 rounded-lg items-center justify-center">
-                <Text className="text-white font-bold text-xs">MOMO</Text>
+              <Image
+                source={require("@/assets/images/momo_icon.png")}
+                className="w-10 h-10 rounded-lg"
+                resizeMode="cover"
+              />
+              <View>
+                <Text className={`${textColor} font-semibold`}>Ví MoMo</Text>
+                <Text className={`${textMuted} text-xs mt-1`}>
+                  Thanh toán nhanh qua ứng dụng MoMo
+                </Text>
               </View>
-              <Text className={`${textColor} font-semibold`}>Ví MoMo</Text>
             </View>
             <View
               className={`w-5 h-5 rounded-full border-2 ${
@@ -395,70 +596,6 @@ export default function CheckoutScreen() {
               }`}
             >
               {selectedPaymentMethod === "MOMO" && (
-                <View className="w-full h-full rounded-full bg-red-600" />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Credit/Debit Card */}
-          <TouchableOpacity
-            className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
-              selectedPaymentMethod === "VNPAY"
-                ? `${cardBg} border-red-600`
-                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
-            }`}
-            onPress={() => setSelectedPaymentMethod("VNPAY")}
-          >
-            <View className="flex-row items-center gap-3">
-              <View
-                className={`w-10 h-10 ${isDark ? "bg-slate-600" : "bg-slate-400"} rounded-lg items-center justify-center`}
-              >
-                <Ionicons name="card" size={20} color="#fff" />
-              </View>
-              <Text className={`${textColor} font-semibold`}>
-                Thẻ Tín dụng / Ghi nợ
-              </Text>
-            </View>
-            <View
-              className={`w-5 h-5 rounded-full border-2 ${
-                selectedPaymentMethod === "VNPAY"
-                  ? "border-red-600 bg-red-600"
-                  : isDark
-                    ? "border-slate-600"
-                    : "border-slate-400"
-              }`}
-            >
-              {selectedPaymentMethod === "VNPAY" && (
-                <View className="w-full h-full rounded-full bg-red-600" />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* ZaloPay */}
-          <TouchableOpacity
-            className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
-              selectedPaymentMethod === "ZALOPAY"
-                ? `${cardBg} border-red-600`
-                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
-            }`}
-            onPress={() => setSelectedPaymentMethod("ZALOPAY")}
-          >
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 bg-teal-500 rounded-lg items-center justify-center">
-                <Text className="text-white font-bold text-xs">zab</Text>
-              </View>
-              <Text className={`${textColor} font-semibold`}>Ví ZaloPay</Text>
-            </View>
-            <View
-              className={`w-5 h-5 rounded-full border-2 ${
-                selectedPaymentMethod === "ZALOPAY"
-                  ? "border-red-600 bg-red-600"
-                  : isDark
-                    ? "border-slate-600"
-                    : "border-slate-400"
-              }`}
-            >
-              {selectedPaymentMethod === "ZALOPAY" && (
                 <View className="w-full h-full rounded-full bg-red-600" />
               )}
             </View>
