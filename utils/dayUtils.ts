@@ -24,3 +24,11 @@ export const generateDateOptions = (): DateOption[] => {
 
   return options;
 };
+
+export function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+}

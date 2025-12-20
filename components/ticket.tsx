@@ -6,10 +6,10 @@ import { useState, useEffect } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { generateBookingQRData } from "@/utils/qrCodeHelpers";
 import { showtimeSelectionService } from "@/services/showtime-selection";
+import { formatDate } from "@/utils/dayUtils";
 
 interface TicketProps {
   booking: Booking;
-  onPress?: () => void;
 }
 
 interface ShowtimeData {
@@ -29,7 +29,7 @@ interface SeatData {
   type: string;
 }
 
-export const Ticket = ({ booking, onPress }: TicketProps) => {
+export const Ticket = ({ booking }: TicketProps) => {
   const { isDark } = useTheme();
   const [showtimeData, setShowtimeData] = useState<ShowtimeData | null>(null);
   const [seatsData, setSeatsData] = useState<SeatData[]>([]);
@@ -63,7 +63,7 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
             }),
         ]);
 
-        // Format start time from ISO string
+        // Format start time
         const startTimeDate = new Date(showtimeDetails.startTime);
         const formattedStartTime = startTimeDate.toLocaleTimeString("vi-VN", {
           hour: "2-digit",
@@ -72,51 +72,40 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
 
         setShowtimeData({
           id: booking.showtimeId,
-          movieTitle: movieDetails?.title ?? "Movie Title",
-          cinemaName: cinemaDetails?.name ?? "CinemaGo Cinema",
-          roomName: roomDetails?.name ?? "Theater Room",
-          startTime: formattedStartTime || "N/A",
-          date: formatDate(showtimeDetails.startTime),
+          movieTitle: movieDetails?.title,
+          cinemaName: cinemaDetails?.name,
+          roomName: roomDetails?.name,
+          startTime: formattedStartTime,
+          date: formatDate(new Date(showtimeDetails.startTime)),
           price: booking.totalPrice / booking.bookingSeats.length,
         });
 
-        const seatsData = booking.bookingSeats.map((seat, index) => {
-          const seatMatch = seat.seatId.match(/seat-([a-z])(\d+)/i);
-          let seatNumber = `${String.fromCharCode(65 + index)}${index + 1}`;
-          let row = String.fromCharCode(65 + index);
+        const seatMap = new Map<string, any>();
+        if (roomDetails?.seats && Array.isArray(roomDetails.seats)) {
+          roomDetails.seats.forEach((seat: any) => {
+            seatMap.set(seat.id, seat);
+          });
+        }
 
-          if (seatMatch) {
-            row = seatMatch[1].toUpperCase();
-            seatNumber = `${row}${seatMatch[2]}`;
+        // Map booking seats to seat data
+        const seatsData = booking.bookingSeats.map((bookingSeat) => {
+          const seatData = seatMap.get(bookingSeat.seatId);
+
+          if (seatData) {
+            const rowMatch = seatData.seatNumber?.match(/^([A-Z])/i);
+            const row = rowMatch ? rowMatch[1].toUpperCase() : "A";
+
+            return {
+              id: bookingSeat.seatId,
+              seatNumber: seatData.seatNumber || bookingSeat.seatId,
+              row,
+              type: seatData.seatType || "NORMAL",
+            };
           }
-
-          return {
-            id: seat.seatId,
-            seatNumber,
-            row,
-            type: "Regular",
-          };
         });
-        setSeatsData(seatsData);
+        setSeatsData(seatsData as SeatData[]);
       } catch (error) {
         console.error("Error fetching ticket data:", error);
-        setShowtimeData({
-          id: booking.showtimeId,
-          movieTitle: "Movie Title",
-          cinemaName: "CinemaGo Cinema",
-          roomName: "Theater Room",
-          startTime: "19:30",
-          date: booking.createdAt.toLocaleDateString(),
-          price: booking.totalPrice / booking.bookingSeats.length,
-        });
-
-        const fallbackSeats = booking.bookingSeats.map((seat, index) => ({
-          id: seat.seatId,
-          seatNumber: `A${index + 1}`,
-          row: "A",
-          type: "Regular",
-        }));
-        setSeatsData(fallbackSeats);
       } finally {
         setLoading(false);
       }
@@ -124,16 +113,6 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
 
     fetchTicketData();
   }, [booking]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -147,17 +126,13 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
       <View
         className={`p-4 rounded-2xl mx-4 mb-4 bg-card-background border border-border`}
       >
-        <Text className="text-center text-text-muted">Loading ticket...</Text>
+        <Text className="text-center text-text-muted">Đang tải vé...</Text>
       </View>
     );
   }
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      className={`mx-4 mb-4 ${isDark ? "dark" : "light"}`}
-      activeOpacity={0.8}
-    >
+    <View className={`mx-4 mb-4 ${isDark ? "dark" : "light"}`} key={booking.id}>
       {/* Ticket Container */}
       <View className="bg-card-background rounded-t-2xl border border-border border-b-0 overflow-hidden">
         {/* Header Section */}
@@ -188,12 +163,12 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
                     color={isDark ? "#9ca3af" : "#6b7280"}
                   />
                   <Text className="text-text-muted text-xs font-[medium] ml-2">
-                    Date & Time
+                    Suất chiếu
                   </Text>
                 </View>
                 <Text className="text-foreground text-sm font-[semibold]">
                   {showtimeData?.date ||
-                    formatDate(booking.createdAt.toString())}
+                    formatDate(new Date(booking.createdAt))}
                 </Text>
                 <Text className="text-foreground text-lg font-[bold]">
                   {showtimeData?.startTime || "N/A"}
@@ -209,7 +184,7 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
                     color={isDark ? "#9ca3af" : "#6b7280"}
                   />
                   <Text className="text-text-muted text-xs font-[medium] ml-2">
-                    Seats ({booking.bookingSeats.length})
+                    Ghế ({booking.bookingSeats.length})
                   </Text>
                 </View>
                 <View className="flex-row flex-wrap">
@@ -253,7 +228,7 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
         <View className="flex-row justify-between items-center">
           <View>
             <Text className="text-text-muted text-xs font-[medium]">
-              Total Amount
+              Tổng tiền
             </Text>
             <Text className="text-foreground text-2xl font-[bold]">
               {formatPrice(booking.totalPrice)}
@@ -261,7 +236,7 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
           </View>
           <View className="items-end">
             <Text className="text-text-muted text-xs font-[medium]">
-              Booking ID
+              Mã đặt vé
             </Text>
             <Text className="text-foreground text-sm font-[semibold]">
               #{booking.id.slice(-8).toUpperCase()}
@@ -269,6 +244,6 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 };

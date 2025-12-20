@@ -96,12 +96,8 @@ export default function MyTickets() {
     fetchBookings();
   }, [fetchBookings]);
 
-  const handleTicketPress = (booking: Booking) => {
-    console.log("Ticket pressed:", booking.id);
-  };
-
   const renderTicketItem = ({ item }: { item: Booking }) => (
-    <Ticket booking={item} onPress={() => handleTicketPress(item)} />
+    <Ticket booking={item} />
   );
 
   const renderEmptyState = () => (
@@ -114,18 +110,17 @@ export default function MyTickets() {
         />
       </View>
       <Text className="text-xl font-[bold] text-foreground text-center mb-2">
-        No Tickets Yet
+        Bạn chưa có vé nào
       </Text>
       <Text className="text-text-muted text-center mb-6 leading-6">
-        You haven't booked any movies yet. Start exploring and book your first
-        ticket!
+        Bạn chưa có vé nào. Bắt đầu khám phá và đặt vé của bạn!
       </Text>
       <TouchableOpacity
         onPress={() => router.push("/(app)/(tabs)/home")}
         className="bg-primary px-8 py-3 rounded-xl"
       >
         <Text className="text-white font-[semibold] text-base">
-          Browse Movies
+          Khám phá phim
         </Text>
       </TouchableOpacity>
     </View>
@@ -147,12 +142,12 @@ export default function MyTickets() {
       >
         <View className="flex-row p-4 border-b border-border">
           <Text className="text-xl ml-4 w-full text-center font-[bold] text-foreground">
-            My Tickets
+            Vé của tôi
           </Text>
         </View>
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
-          <Text className="text-text-muted mt-4">Loading your tickets...</Text>
+          <Text className="text-text-muted mt-4">Đang tải vé của bạn...</Text>
         </View>
       </SafeAreaView>
     );
@@ -180,7 +175,7 @@ export default function MyTickets() {
           />
         </TouchableOpacity>
         <Text className="text-xl w-full text-center font-[bold] text-foreground">
-          My Tickets
+          Vé của tôi
         </Text>
       </View>
 
@@ -207,33 +202,39 @@ export default function MyTickets() {
       />
 
       {/* Tickets Summary */}
-      {bookings.length > 0 && (
+      {loading ? (
         <View className="bg-card-background border-t border-border p-4">
-          <View className="flex-row justify-between items-center">
-            <Text className="text-text-muted text-sm font-[medium]">
-              Total Tickets
-            </Text>
-            <Text className="text-foreground text-lg font-[bold]">
-              {bookings.length}
-            </Text>
-          </View>
-          <View className="flex-row justify-between items-center mt-2">
-            <Text className="text-text-muted text-sm font-[medium]">
-              Total Spent
-            </Text>
-            <Text className="text-primary text-lg font-[bold]">
-              {new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: "VND",
-              }).format(
-                bookings.reduce(
-                  (total, booking) => total + booking.totalPrice,
-                  0
-                )
-              )}
-            </Text>
-          </View>
+          <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
         </View>
+      ) : (
+        bookings.length > 0 && (
+          <View className="bg-card-background border-t border-border p-4">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-text-muted text-sm font-[medium]">
+                Tổng số vé
+              </Text>
+              <Text className="text-foreground text-lg font-[bold]">
+                {bookings.length}
+              </Text>
+            </View>
+            <View className="flex-row justify-between items-center mt-2">
+              <Text className="text-text-muted text-sm font-[medium]">
+                Tổng tiền
+              </Text>
+              <Text className="text-primary text-lg font-[bold]">
+                {new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                }).format(
+                  bookings.reduce(
+                    (total, booking) => total + booking.totalPrice,
+                    0
+                  )
+                )}
+              </Text>
+            </View>
+          </View>
+        )
       )}
     </SafeAreaView>
   );
