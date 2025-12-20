@@ -145,25 +145,46 @@ export default function CheckoutScreen() {
         return;
       }
 
-      const foodDrinks =
+      try {
+        await Promise.all(
+          validSeatIds.map((seatId: string) =>
+            bookingService
+              .holdSeat({
+                showtimeId,
+                seatId,
+              })
+              .catch((error: any) => {
+                if (error.response?.status !== 409) {
+                  console.warn("Failed to re-hold seat:", seatId, error);
+                }
+              })
+          )
+        );
+      } catch (error) {
+        console.warn("Error re-holding seats:", error);
+      }
+
+      const foodDrinksData =
         foodDrinkData.length > 0
           ? foodDrinkData.map((fd: any) => ({
-              id: fd.id,
+              foodDrinkId: fd.id,
               quantity: fd.quantity,
             }))
-          : undefined;
+          : [];
 
       console.log("Creating booking with:", {
         showtimeId,
         seatIds: validSeatIds,
-        foodDrinks,
+        foodDrinks: foodDrinksData,
       });
 
-      const booking = await bookingService.createBooking(
+      const bookingResponse = await bookingService.createBooking({
         showtimeId,
-        validSeatIds,
-        foodDrinks
-      );
+        seatIds: validSeatIds,
+        foodDrinks: foodDrinksData.length > 0 ? foodDrinksData : [],
+      });
+
+      const booking = bookingResponse.data;
 
       switch (selectedPaymentMethod) {
         case "COD": {

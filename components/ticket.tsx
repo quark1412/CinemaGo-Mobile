@@ -5,7 +5,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { useState, useEffect } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { generateBookingQRData } from "@/utils/qrCodeHelpers";
-import { showTimeService } from "@/services/showtime";
+import { showtimeSelectionService } from "@/services/showtime-selection";
 
 interface TicketProps {
   booking: Booking;
@@ -38,24 +38,49 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
   useEffect(() => {
     const fetchTicketData = async () => {
       try {
-        // Fetch showtime details using the real API
-        const showtimeDetails = await showTimeService.getShowTimeById(
+        const showtimeDetails = await showtimeSelectionService.getShowtimeById(
           booking.showtimeId
         );
 
+        const [movieDetails, cinemaDetails, roomDetails] = await Promise.all([
+          showtimeSelectionService
+            .getMovieDetails(showtimeDetails.movieId)
+            .catch((err) => {
+              console.warn("Failed to fetch movie details:", err);
+              return null;
+            }),
+          showtimeSelectionService
+            .getCinemaDetails(showtimeDetails.cinemaId)
+            .catch((err) => {
+              console.warn("Failed to fetch cinema details:", err);
+              return null;
+            }),
+          showtimeSelectionService
+            .getRoomById(showtimeDetails.roomId)
+            .catch((err) => {
+              console.warn("Failed to fetch room details:", err);
+              return null;
+            }),
+        ]);
+
+        // Format start time from ISO string
+        const startTimeDate = new Date(showtimeDetails.startTime);
+        const formattedStartTime = startTimeDate.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
         setShowtimeData({
           id: booking.showtimeId,
-          movieTitle: showtimeDetails.movie?.title || "Movie Title",
-          cinemaName: showtimeDetails.cinema?.name || "CinemaGo Cinema",
-          roomName: showtimeDetails.room?.name || "Theater Room",
-          startTime: showtimeDetails.startTime,
+          movieTitle: movieDetails?.title ?? "Movie Title",
+          cinemaName: cinemaDetails?.name ?? "CinemaGo Cinema",
+          roomName: roomDetails?.name ?? "Theater Room",
+          startTime: formattedStartTime || "N/A",
           date: formatDate(showtimeDetails.startTime),
           price: booking.totalPrice / booking.bookingSeats.length,
         });
 
-        // Convert seat IDs to display format
         const seatsData = booking.bookingSeats.map((seat, index) => {
-          // Try to extract seat info from seatId
           const seatMatch = seat.seatId.match(/seat-([a-z])(\d+)/i);
           let seatNumber = `${String.fromCharCode(65 + index)}${index + 1}`;
           let row = String.fromCharCode(65 + index);
@@ -75,7 +100,6 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
         setSeatsData(seatsData);
       } catch (error) {
         console.error("Error fetching ticket data:", error);
-        // Fallback to basic data if API calls fail
         setShowtimeData({
           id: booking.showtimeId,
           movieTitle: "Movie Title",
@@ -147,11 +171,6 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
                 {showtimeData?.cinemaName} • {showtimeData?.roomName}
               </Text>
             </View>
-            <View className="bg-white/20 px-3 py-1 rounded-full">
-              <Text className="text-white text-xs font-[semibold]">
-                #{booking.id.slice(-6).toUpperCase()}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -173,10 +192,11 @@ export const Ticket = ({ booking, onPress }: TicketProps) => {
                   </Text>
                 </View>
                 <Text className="text-foreground text-sm font-[semibold]">
-                  {formatDate(booking.createdAt.toString())}
+                  {showtimeData?.date ||
+                    formatDate(booking.createdAt.toString())}
                 </Text>
                 <Text className="text-foreground text-lg font-[bold]">
-                  {showtimeData?.startTime}
+                  {showtimeData?.startTime || "N/A"}
                 </Text>
               </View>
 

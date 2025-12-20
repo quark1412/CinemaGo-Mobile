@@ -13,8 +13,9 @@ import { router } from "expo-router";
 import { useTheme } from "@/contexts/themeContext";
 import { useToast } from "@/contexts/toastContext";
 import { Ticket } from "@/components/ticket";
-import { bookingService } from "@/services/booking";
+import { bookingService, Booking as ServiceBooking } from "@/services/booking";
 import { Booking } from "@/types/booking";
+import { generateBookingQRData } from "@/utils/qrCodeHelpers";
 
 export default function MyTickets() {
   const { isDark } = useTheme();
@@ -23,58 +24,77 @@ export default function MyTickets() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    hasNextPage: false,
-  });
 
-  const fetchBookings = useCallback(
-    async (page: number = 1, isRefresh: boolean = false) => {
-      try {
-        if (page === 1) {
-          isRefresh ? setRefreshing(true) : setLoading(true);
-        } else {
-          setLoadingMore(true);
+  const fetchBookings = useCallback(async () => {
+    try {
+      const response = await bookingService.getMyBookings();
+      const allBookings = response.data as ServiceBooking[];
+
+      const convertedBookings: Booking[] = allBookings.map((serviceBooking) => {
+        // Generate QR code data
+        try {
+          generateBookingQRData({
+            id: serviceBooking.id,
+            userId: serviceBooking.userId,
+            showtimeId: serviceBooking.showtimeId,
+            totalPrice: serviceBooking.totalPrice,
+            bookingSeats: serviceBooking.bookingSeats.map((seat) => ({
+              seatId: seat.seatId,
+            })),
+            createdAt:
+              serviceBooking.createdAt instanceof Date
+                ? serviceBooking.createdAt
+                : new Date(serviceBooking.createdAt),
+          });
+        } catch (error) {
+          console.error(
+            `Failed to generate QR code for booking ${serviceBooking.id}:`,
+            error
+          );
         }
 
-        const response = await bookingService.getMyBookings(page, 10);
+        return {
+          id: serviceBooking.id,
+          userId: serviceBooking.userId,
+          showtimeId: serviceBooking.showtimeId,
+          totalPrice: serviceBooking.totalPrice,
+          bookingSeats: serviceBooking.bookingSeats.map((seat) => ({
+            id: seat.id,
+            bookingId: serviceBooking.id,
+            booking: {} as Booking,
+            seatId: seat.seatId,
+            showtimeId: seat.showtimeId,
+            createdAt: serviceBooking.createdAt,
+            updatedAt: serviceBooking.updatedAt,
+          })),
+          createdAt:
+            serviceBooking.createdAt instanceof Date
+              ? serviceBooking.createdAt
+              : new Date(serviceBooking.createdAt),
+          updatedAt:
+            serviceBooking.updatedAt instanceof Date
+              ? serviceBooking.updatedAt
+              : new Date(serviceBooking.updatedAt),
+        } as Booking;
+      });
 
-        if (page === 1) {
-          setBookings(response.bookings);
-        } else {
-          setBookings((prev) => [...prev, ...response.bookings]);
-        }
-
-        setPagination({
-          currentPage: response.pagination.currentPage,
-          totalPages: response.pagination.totalPages,
-          hasNextPage: response.pagination.hasNextPage,
-        });
-      } catch (error: any) {
-        showToast(error.message || "Failed to fetch tickets", "error");
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    },
-    [showToast]
-  );
+      setBookings(convertedBookings);
+    } catch (error: any) {
+      showToast(error.message || "Failed to fetch tickets", "error");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+    }
+  }, [showToast]);
 
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
 
   const onRefresh = useCallback(() => {
-    fetchBookings(1, true);
+    fetchBookings();
   }, [fetchBookings]);
-
-  const loadMore = useCallback(() => {
-    if (!loadingMore && pagination.hasNextPage) {
-      fetchBookings(pagination.currentPage + 1);
-    }
-  }, [fetchBookings, loadingMore, pagination]);
 
   const handleTicketPress = (booking: Booking) => {
     console.log("Ticket pressed:", booking.id);
@@ -182,8 +202,6 @@ export default function MyTickets() {
             tintColor={isDark ? "#fff" : "#000"}
           />
         }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.3}
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderLoadingFooter}
       />

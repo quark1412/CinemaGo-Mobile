@@ -467,7 +467,6 @@ export default function ShowtimeSelectionScreen() {
           const bookedSeatsResponse = await bookingService.getBookedSeats(
             showtime.id
           );
-          console.log("Booked seats response:", bookedSeatsResponse);
 
           const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
             ? bookedSeatsResponse.data
@@ -475,8 +474,6 @@ export default function ShowtimeSelectionScreen() {
                 .filter((id: any) => Boolean(id))
             : [];
           setBookedSeatIds(bookedIds);
-          console.log("Booked seat IDs:", bookedIds);
-          console.log("Seat map size:", newSeatMap.size);
 
           // Get booked seat numbers
           const bookedNumbers: string[] = [];
@@ -497,44 +494,35 @@ export default function ShowtimeSelectionScreen() {
 
             if (seat && seat.seatNumber) {
               bookedNumbers.push(seat.seatNumber);
-            } else {
-              console.warn(`Could not find seat number for seatId: ${seatId}`);
             }
           });
-          console.log("Booked seat numbers:", bookedNumbers);
           setBookedSeats(bookedNumbers);
         } catch (error: any) {
-          console.error("Error loading booked seats:", error);
           if (error.response?.status === 404) {
             setBookedSeatIds([]);
             setBookedSeats([]);
           } else {
-            console.warn("Failed to load booked seats:", error);
             setBookedSeatIds([]);
             setBookedSeats([]);
           }
         }
 
-        // Load held seats - after layout is created
+        // Load held seats
         try {
           const heldSeatsResponse = await bookingService.getHeldSeats(
             showtime.id
           );
-          console.log("Held seats response:", heldSeatsResponse);
 
           const heldIds = heldSeatsResponse.data.map((h) => h.seatId);
           setHeldSeatIds(heldIds);
-          console.log("Held seat IDs:", heldIds);
 
-          // Get held seat numbers - check both seatMap and layout
+          // Get held seat numbers
           const heldNumbers: string[] = [];
           heldIds.forEach((seatId) => {
-            // First try to find in seatMap
             let seat = Array.from(newSeatMap.values()).find(
               (s) => s.id === seatId
             );
 
-            // If not found in seatMap, try to find in the layout seats we just created
             if (!seat && seats) {
               const layoutSeat = seats
                 .flat()
@@ -547,17 +535,10 @@ export default function ShowtimeSelectionScreen() {
 
             if (seat && seat.seatNumber) {
               heldNumbers.push(seat.seatNumber);
-            } else {
-              console.warn(
-                `Could not find seat number for held seatId: ${seatId}`
-              );
             }
           });
-          console.log("Held seat numbers:", heldNumbers);
           setHeldSeatNumbers(heldNumbers);
         } catch (err) {
-          console.error("Error loading held seats:", err);
-          console.warn("Failed to load held seats:", err);
           setHeldSeatIds([]);
           setHeldSeatNumbers([]);
         }
@@ -588,7 +569,6 @@ export default function ShowtimeSelectionScreen() {
           });
           setBookedSeats(bookedNumbers);
         } catch (error: any) {
-          console.warn("Failed to load booked seats:", error);
           setBookedSeatIds([]);
           setBookedSeats([]);
         }
@@ -612,7 +592,6 @@ export default function ShowtimeSelectionScreen() {
           });
           setHeldSeatNumbers(heldNumbers);
         } catch (err) {
-          console.warn("Failed to load held seats:", err);
           setHeldSeatIds([]);
           setHeldSeatNumbers([]);
         }
@@ -919,12 +898,12 @@ export default function ShowtimeSelectionScreen() {
     });
   };
 
-  // Get seat status and styling (matching frontend design)
+  // Get seat status and styling
   const getSeatStatus = useCallback(
     (seat: Seat): "available" | "booked" | "held" | "selected" => {
       if (!seat.seatNumber || seat.type === SeatType.EMPTY) return "available";
 
-      // Check if seat is selected by current user first (highest priority)
+      // Check if seat is selected by current user
       const isSelected = selectedSeats.some(
         (s) => s.seatNumber === seat.seatNumber || s.id === seat.id
       );
@@ -945,7 +924,7 @@ export default function ShowtimeSelectionScreen() {
           if (heldSeatNumbers.includes(individualSeatNumber)) return "held";
         }
       } else {
-        // Regular seat - check booked first, then held
+        // Regular seat
         if (bookedSeats.includes(seat.seatNumber)) return "booked";
         if (heldSeatNumbers.includes(seat.seatNumber)) return "held";
       }
@@ -971,7 +950,7 @@ export default function ShowtimeSelectionScreen() {
 
     switch (status) {
       case "booked":
-        return "bg-red-100 border-red-500";
+        return "bg-red-100 border-red-500 opacity-75";
       case "held":
         return "bg-yellow-100 border-yellow-500";
       case "selected":
@@ -1425,19 +1404,8 @@ export default function ShowtimeSelectionScreen() {
                                   seat.type === SeatType.BLOCKED ||
                                   status === "booked";
 
-                                // Determine icon and text colors based on status
-                                let iconColor = "#1f2937"; // gray-800
-                                let textColor = "#1f2937"; // gray-800
-                                if (status === "booked") {
-                                  iconColor = "#ef4444"; // red-500
-                                  textColor = "#ef4444";
-                                } else if (status === "held") {
-                                  iconColor = "#eab308"; // yellow-500
-                                  textColor = "#eab308";
-                                } else if (status === "selected") {
-                                  iconColor = "#3b82f6"; // blue-500
-                                  textColor = "#3b82f6";
-                                }
+                                let iconColor = "#1f2937";
+                                let textColor = "#1f2937";
 
                                 if (isCoupleLeft) {
                                   return (

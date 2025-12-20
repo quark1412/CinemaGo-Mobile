@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 let socket: Socket | null = null;
 let socketPromise: Promise<Socket> | null = null;
 
-const SOCKET_URL = "http://192.168.1.12:8000";
+const SOCKET_URL = "http://192.168.1.9:8000";
 
 const createSocket = async (): Promise<Socket> => {
   const accessToken = await AsyncStorage.getItem("accessToken");
