@@ -270,4 +270,16 @@ export const showtimeSelectionService = {
       );
     }
   },
+
+  // Get room by ID (similar to POS implementation)
+  getRoomById: async (roomId: string) => {
+    try {
+      const response = await axiosConfig.get(`/rooms/public/${roomId}`);
+      return response.data.data;
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch room details"
+      );
+    }
+  },
 };

@@ -19,6 +19,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome, FontAwesome6, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { showtimeSelectionService } from "@/services/showtime-selection";
 import { fooddrinkService, FoodDrink } from "@/services/fooddrink";
 import {
@@ -61,6 +62,13 @@ export default function ShowtimeSelectionScreen() {
   );
   const [rawSeatLayout, setRawSeatLayout] = useState<SeatLayout | null>(null);
   const [seatLayout, setSeatLayout] = useState<SeatLayout | null>(null);
+  const [room, setRoom] = useState<any>(null);
+  const [seatMap, setSeatMap] = useState<Map<string, any>>(new Map());
+  const [seatPriceMap, setSeatPriceMap] = useState<Map<string, number>>(
+    new Map()
+  );
+  const [bookedSeatIds, setBookedSeatIds] = useState<string[]>([]);
+  const [heldSeatIds, setHeldSeatIds] = useState<string[]>([]);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
   const [heldSeatNumbers, setHeldSeatNumbers] = useState<string[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
@@ -70,6 +78,8 @@ export default function ShowtimeSelectionScreen() {
     SelectedFoodDrink[]
   >([]);
   const [loadingFoodDrinks, setLoadingFoodDrinks] = useState(false);
+
+  // Timer state
   const [timeRemaining, setTimeRemaining] = useState({
     minutes: SEAT_HOLD_TIMEOUT_MINUTES,
     seconds: 0,
@@ -97,53 +107,42 @@ export default function ShowtimeSelectionScreen() {
 
   // Calculate total price
   const totalPrice = useMemo(() => {
+    if (!selectedShowtime) return 0;
+
+    const basePrice = selectedShowtime.price || 0;
     const seatsPrice = selectedSeats.reduce((sum, seat) => {
-      const seatPrice = seat.isCoupleSeat ? seat.price * 2 : seat.price;
-      return sum + seatPrice;
+      const extraPrice =
+        seat.extraPrice || seatPriceMap.get(seat.seatNumber) || 0;
+      const seatPrice = basePrice + extraPrice;
+      const finalPrice = seat.isCoupleSeat ? seatPrice * 2 : seatPrice;
+      return sum + finalPrice;
     }, 0);
+
     const foodDrinksPrice = selectedFoodDrinks.reduce(
       (sum, foodDrink) => sum + foodDrink.foodDrink.price * foodDrink.quantity,
       0
     );
+
     return seatsPrice + foodDrinksPrice;
-  }, [selectedSeats, selectedFoodDrinks]);
+  }, [selectedSeats, selectedFoodDrinks, selectedShowtime, seatPriceMap]);
 
-  // Get selected seat numbers
-  const selectedSeatNumbers = useMemo(() => {
-    return selectedSeats.map((seat) => seat.seatNumber).join(", ");
-  }, [selectedSeats]);
+  // Calculate remaining time
+  const calculateRemainingTime = useCallback((startTime: number) => {
+    const now = Date.now();
+    const elapsed = Math.floor((now - startTime) / 1000);
+    const totalSeconds = SEAT_HOLD_TIMEOUT_MINUTES * 60 - elapsed;
 
-  // Initial data load
-  useEffect(() => {
-    loadInitialData();
-  }, [movieId]);
-
-  useEffect(() => {
-    if (dateOptions.length > 0 && !selectedDate) {
-      setSelectedDate(dateOptions[0]);
+    if (totalSeconds <= 0) {
+      return { minutes: 0, seconds: 0 };
     }
-  }, [dateOptions]);
 
-  useEffect(() => {
-    loadFoodDrinks();
+    return {
+      minutes: Math.floor(totalSeconds / 60),
+      seconds: totalSeconds % 60,
+    };
   }, []);
 
-  // Calculate remaining time from start timestamp
-  const calculateRemainingTime = (
-    startTime: number
-  ): { minutes: number; seconds: number } => {
-    const now = Date.now();
-    const elapsed = Math.floor((now - startTime) / 1000); // elapsed in seconds
-    const totalSeconds = SEAT_HOLD_TIMEOUT_MINUTES * 60;
-    const remaining = Math.max(0, totalSeconds - elapsed);
-
-    const minutes = Math.floor(remaining / 60);
-    const seconds = remaining % 60;
-
-    return { minutes, seconds };
-  };
-
-  // Release all seats when timer expires
+  // Handle timer expiration
   const handleTimerExpired = useCallback(async () => {
     if (!selectedShowtime || selectedSeats.length === 0) return;
 
@@ -156,38 +155,28 @@ export default function ShowtimeSelectionScreen() {
               showtimeId: selectedShowtime.id,
               seatId: seat.id ?? seat.seatNumber,
             })
-            .catch((err) => {
-              console.error("Failed to release seat:", err);
-            })
+            .catch(() => {})
         )
       );
 
       setSelectedSeats([]);
+      setHeldSeatIds([]);
       setHeldSeatNumbers([]);
       setTimerActive(false);
       timerStartTimeRef.current = null;
-      showToast(
-        "Thời gian giữ ghế đã hết hạn. Vui lòng chọn lại ghế.",
-        "error"
-      );
-    } catch (error: any) {
-      console.error("Failed to release seats on timer expiry:", error);
+
+      showToast("Hết thời gian giữ ghế.", "error");
+    } catch (error) {
+      console.error("Failed to release seats on timer expiration:", error);
     }
   }, [selectedShowtime, selectedSeats, showToast]);
 
-  // Start timer when first seat is selected
+  // Start timer when seats are selected
   useEffect(() => {
-    if (selectedSeats.length > 0 && selectedShowtime) {
-      if (!timerActive && !timerStartTimeRef.current) {
-        const startTime = Date.now();
-        timerStartTimeRef.current = startTime;
-        setTimerActive(true);
-        setTimeRemaining({
-          minutes: SEAT_HOLD_TIMEOUT_MINUTES,
-          seconds: 0,
-        });
-      }
-    } else if (selectedSeats.length === 0) {
+    if (selectedSeats.length > 0 && !timerActive) {
+      timerStartTimeRef.current = Date.now();
+      setTimerActive(true);
+    } else if (selectedSeats.length === 0 && timerActive) {
       setTimerActive(false);
       timerStartTimeRef.current = null;
       setTimeRemaining({
@@ -195,9 +184,9 @@ export default function ShowtimeSelectionScreen() {
         seconds: 0,
       });
     }
-  }, [selectedSeats.length, selectedShowtime, timerActive]);
+  }, [selectedSeats.length, timerActive]);
 
-  // Handle app state changes
+  // AppState listener to handle background/foreground transitions
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (
@@ -206,10 +195,11 @@ export default function ShowtimeSelectionScreen() {
         timerActive &&
         timerStartTimeRef.current
       ) {
+        // Recalculate remaining time when app comes to foreground
         const remaining = calculateRemainingTime(timerStartTimeRef.current);
         setTimeRemaining(remaining);
 
-        // Check if expired
+        // Check if expired while in background
         if (remaining.minutes === 0 && remaining.seconds === 0) {
           handleTimerExpired();
         }
@@ -220,11 +210,11 @@ export default function ShowtimeSelectionScreen() {
     return () => {
       subscription.remove();
     };
-  }, [timerActive, handleTimerExpired]);
+  }, [timerActive, calculateRemainingTime, handleTimerExpired]);
 
-  // Countdown timer use timestamp-based
+  // Countdown timer effect
   useEffect(() => {
-    if (!timerActive || !selectedShowtime || !timerStartTimeRef.current) return;
+    if (!timerActive || !timerStartTimeRef.current) return;
 
     const interval = setInterval(() => {
       if (!timerStartTimeRef.current) return;
@@ -240,21 +230,7 @@ export default function ShowtimeSelectionScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timerActive, selectedShowtime, handleTimerExpired]);
-
-  // Handle timer expiration
-  useEffect(() => {
-    if (
-      timerActive &&
-      timeRemaining.minutes === 0 &&
-      timeRemaining.seconds === 0 &&
-      selectedSeats.length > 0 &&
-      selectedShowtime
-    ) {
-      handleTimerExpired();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeRemaining.minutes, timeRemaining.seconds]);
+  }, [timerActive, calculateRemainingTime, handleTimerExpired]);
 
   const formatTime = (minutes: number, seconds: number) => {
     return {
@@ -283,12 +259,20 @@ export default function ShowtimeSelectionScreen() {
       );
       setShowtimes(showtimesData);
 
-      // Load cinema details from first showtime if available
+      // Load cinema details
       if (showtimesData.length > 0) {
         const cinema = await showtimeSelectionService.getCinemaDetails(
           showtimesData[0].cinemaId
         );
         setCinemaDetails(cinema);
+      }
+
+      // Set default date to today
+      const todayOption = dateOptions.find(
+        (opt) => opt.fullDate === today.toISOString().split("T")[0]
+      );
+      if (todayOption) {
+        setSelectedDate(todayOption);
       }
     } catch (error: any) {
       showToast(error.message || "Failed to load data", "error");
@@ -313,10 +297,23 @@ export default function ShowtimeSelectionScreen() {
     }
   };
 
+  useEffect(() => {
+    loadInitialData();
+    loadFoodDrinks();
+  }, []);
+
   const handleDateSelect = (date: DateOption) => {
     setSelectedDate(date);
     setSelectedShowtime(null);
     setSeatLayout(null);
+    setRawSeatLayout(null);
+    setRoom(null);
+    setSeatMap(new Map());
+    setSeatPriceMap(new Map());
+    setBookedSeatIds([]);
+    setHeldSeatIds([]);
+    setBookedSeats([]);
+    setHeldSeatNumbers([]);
     setSelectedSeats([]);
   };
 
@@ -326,24 +323,299 @@ export default function ShowtimeSelectionScreen() {
       setSelectedShowtime(showtime);
       setSelectedSeats([]);
 
-      // Load seat layout
-      const layout = await showtimeSelectionService.getRoomSeatLayout(
+      // Load room details with seat layout
+      const roomData = await showtimeSelectionService.getRoomById(
         showtime.roomId
       );
-      setRawSeatLayout(layout);
+      setRoom(roomData);
 
-      // Load booked seats
-      const booked = await showtimeSelectionService.getBookedSeats(showtime.id);
-      console.log("booked", booked);
-      setBookedSeats(booked);
+      // Create seat map from room.seats array
+      const newSeatMap = new Map<string, any>();
+      const newSeatPriceMap = new Map<string, number>();
 
-      // Load currently held seats
-      try {
-        const held = await bookingService.getHeldSeats(showtime.id);
-        setHeldSeatNumbers(held.map((h) => h.seatId));
-      } catch (err) {
-        console.warn("Failed to load held seats:", err);
-        setHeldSeatNumbers([]);
+      // Get seat type prices
+      const seatTypePrices: Record<string, number> = {};
+      if (roomData.seats && Array.isArray(roomData.seats)) {
+        roomData.seats.forEach((seat: any) => {
+          newSeatMap.set(seat.seatNumber, seat);
+          const extraPrice =
+            seat.extraPrice || (roomData as any)[seat.seatType] || 0;
+          newSeatPriceMap.set(seat.seatNumber, extraPrice);
+
+          if (!seatTypePrices[seat.seatType]) {
+            seatTypePrices[seat.seatType] = extraPrice;
+          }
+        });
+      }
+      setSeatMap(newSeatMap);
+      setSeatPriceMap(newSeatPriceMap);
+
+      // Convert seatLayout array to SeatLayout
+      if (roomData.seatLayout && Array.isArray(roomData.seatLayout)) {
+        let maxRow = 0;
+        let maxCol = 0;
+
+        roomData.seatLayout.forEach((seat: any) => {
+          const rowIndex = seat.row.charCodeAt(0) - 65;
+          const colIndex = seat.col - 1;
+
+          if (rowIndex > maxRow) maxRow = rowIndex;
+          if (colIndex > maxCol) maxCol = colIndex;
+        });
+
+        // Create empty layout
+        const rows = maxRow + 1;
+        const cols = maxCol + 1;
+        const seats: Seat[][] = Array.from({ length: rows }, (_, rowIndex) =>
+          Array.from({ length: cols }, (_, colIndex) => ({
+            row: rowIndex,
+            col: colIndex,
+            seatNumber: "",
+            type: SeatType.EMPTY,
+            status: SeatStatus.AVAILABLE,
+            price: 0,
+          }))
+        );
+
+        // Fill in seats from seatLayout
+        roomData.seatLayout.forEach((seat: any) => {
+          const rowIndex = seat.row.charCodeAt(0) - 65;
+          const colIndex = seat.col - 1;
+
+          if (rowIndex < rows && colIndex < cols) {
+            const seatNumber = `${seat.row}${seat.col}`;
+            const seatData = newSeatMap.get(seatNumber);
+            const extraPrice =
+              seatData?.extraPrice ||
+              (roomData as any)[seat.type] ||
+              seatTypePrices[seat.type] ||
+              0;
+
+            let type: SeatType;
+            switch (seat.type) {
+              case "VIP":
+                type = SeatType.VIP;
+                break;
+              case "COUPLE":
+                type = SeatType.COUPLE;
+                break;
+              case "BLOCKED":
+                type = SeatType.BLOCKED;
+                break;
+              case "EMPTY":
+                type = SeatType.EMPTY;
+                break;
+              default:
+                type = SeatType.NORMAL;
+            }
+
+            seats[rowIndex][colIndex] = {
+              row: rowIndex,
+              col: colIndex,
+              seatNumber: seatNumber,
+              type: type,
+              status:
+                type === SeatType.BLOCKED
+                  ? SeatStatus.BOOKED
+                  : SeatStatus.AVAILABLE,
+              price: 0,
+              id: seatData?.id,
+              extraPrice: extraPrice,
+            };
+          }
+        });
+
+        // Merge adjacent couple seats
+        for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+          for (let colIndex = 0; colIndex < cols - 1; colIndex++) {
+            const currentSeat = seats[rowIndex][colIndex];
+            const nextSeat = seats[rowIndex][colIndex + 1];
+
+            if (
+              currentSeat.type === SeatType.COUPLE &&
+              nextSeat.type === SeatType.COUPLE &&
+              !currentSeat.isCoupleSeat &&
+              !nextSeat.isCoupleSeat
+            ) {
+              const rowLetter = String.fromCharCode(65 + rowIndex);
+              const coupleSeatNumber = `${rowLetter}${colIndex + 1}-${
+                colIndex + 2
+              }`;
+
+              seats[rowIndex][colIndex] = {
+                ...currentSeat,
+                seatNumber: coupleSeatNumber,
+                isCoupleSeat: true,
+                coupleWith: colIndex + 1,
+              };
+
+              seats[rowIndex][colIndex + 1] = {
+                ...nextSeat,
+                seatNumber: coupleSeatNumber,
+                isCoupleSeat: true,
+                coupleWith: colIndex,
+              };
+            }
+          }
+        }
+
+        const layout: SeatLayout = { rows, cols, seats };
+        setRawSeatLayout(layout);
+
+        // Load booked seats
+        try {
+          const bookedSeatsResponse = await bookingService.getBookedSeats(
+            showtime.id
+          );
+          console.log("Booked seats response:", bookedSeatsResponse);
+
+          const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
+            ? bookedSeatsResponse.data
+                .map((booking: any) => booking.seatId)
+                .filter((id: any) => Boolean(id))
+            : [];
+          setBookedSeatIds(bookedIds);
+          console.log("Booked seat IDs:", bookedIds);
+          console.log("Seat map size:", newSeatMap.size);
+
+          // Get booked seat numbers
+          const bookedNumbers: string[] = [];
+          bookedIds.forEach((seatId) => {
+            let seat = Array.from(newSeatMap.values()).find(
+              (s) => s.id === seatId
+            );
+
+            if (!seat) {
+              const layoutSeat = layout.seats
+                .flat()
+                .find((s: Seat) => s.id === seatId);
+              if (layoutSeat && layoutSeat.seatNumber) {
+                bookedNumbers.push(layoutSeat.seatNumber);
+                return;
+              }
+            }
+
+            if (seat && seat.seatNumber) {
+              bookedNumbers.push(seat.seatNumber);
+            } else {
+              console.warn(`Could not find seat number for seatId: ${seatId}`);
+            }
+          });
+          console.log("Booked seat numbers:", bookedNumbers);
+          setBookedSeats(bookedNumbers);
+        } catch (error: any) {
+          console.error("Error loading booked seats:", error);
+          if (error.response?.status === 404) {
+            setBookedSeatIds([]);
+            setBookedSeats([]);
+          } else {
+            console.warn("Failed to load booked seats:", error);
+            setBookedSeatIds([]);
+            setBookedSeats([]);
+          }
+        }
+
+        // Load held seats - after layout is created
+        try {
+          const heldSeatsResponse = await bookingService.getHeldSeats(
+            showtime.id
+          );
+          console.log("Held seats response:", heldSeatsResponse);
+
+          const heldIds = heldSeatsResponse.data.map((h) => h.seatId);
+          setHeldSeatIds(heldIds);
+          console.log("Held seat IDs:", heldIds);
+
+          // Get held seat numbers - check both seatMap and layout
+          const heldNumbers: string[] = [];
+          heldIds.forEach((seatId) => {
+            // First try to find in seatMap
+            let seat = Array.from(newSeatMap.values()).find(
+              (s) => s.id === seatId
+            );
+
+            // If not found in seatMap, try to find in the layout seats we just created
+            if (!seat && seats) {
+              const layoutSeat = seats
+                .flat()
+                .find((s: Seat) => s.id === seatId);
+              if (layoutSeat && layoutSeat.seatNumber) {
+                heldNumbers.push(layoutSeat.seatNumber);
+                return;
+              }
+            }
+
+            if (seat && seat.seatNumber) {
+              heldNumbers.push(seat.seatNumber);
+            } else {
+              console.warn(
+                `Could not find seat number for held seatId: ${seatId}`
+              );
+            }
+          });
+          console.log("Held seat numbers:", heldNumbers);
+          setHeldSeatNumbers(heldNumbers);
+        } catch (err) {
+          console.error("Error loading held seats:", err);
+          console.warn("Failed to load held seats:", err);
+          setHeldSeatIds([]);
+          setHeldSeatNumbers([]);
+        }
+      }
+
+      // If no seatLayout, still try to load booked/held seats
+      if (!roomData.seatLayout || !Array.isArray(roomData.seatLayout)) {
+        // Load booked seats even if no layout
+        try {
+          const bookedSeatsResponse = await bookingService.getBookedSeats(
+            showtime.id
+          );
+          const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
+            ? bookedSeatsResponse.data
+                .map((booking: any) => booking.seatId)
+                .filter((id: any) => Boolean(id))
+            : [];
+          setBookedSeatIds(bookedIds);
+
+          const bookedNumbers: string[] = [];
+          bookedIds.forEach((seatId) => {
+            const seat = Array.from(newSeatMap.values()).find(
+              (s) => s.id === seatId
+            );
+            if (seat && seat.seatNumber) {
+              bookedNumbers.push(seat.seatNumber);
+            }
+          });
+          setBookedSeats(bookedNumbers);
+        } catch (error: any) {
+          console.warn("Failed to load booked seats:", error);
+          setBookedSeatIds([]);
+          setBookedSeats([]);
+        }
+
+        // Load held seats even if no layout
+        try {
+          const heldSeatsResponse = await bookingService.getHeldSeats(
+            showtime.id
+          );
+          const heldIds = heldSeatsResponse.data.map((h) => h.seatId);
+          setHeldSeatIds(heldIds);
+
+          const heldNumbers: string[] = [];
+          heldIds.forEach((seatId) => {
+            const seat = Array.from(newSeatMap.values()).find(
+              (s) => s.id === seatId
+            );
+            if (seat && seat.seatNumber) {
+              heldNumbers.push(seat.seatNumber);
+            }
+          });
+          setHeldSeatNumbers(heldNumbers);
+        } catch (err) {
+          console.warn("Failed to load held seats:", err);
+          setHeldSeatIds([]);
+          setHeldSeatNumbers([]);
+        }
       }
     } catch (error: any) {
       showToast(error.message || "Failed to load seat map", "error");
@@ -363,9 +635,10 @@ export default function ShowtimeSelectionScreen() {
           return seat;
         }
 
-        const isBooked = booked.includes(seat.id ?? seat.seatNumber);
-        // Calculate price
-        const extraPrice = seat.extraPrice || 0;
+        const isBooked = booked.includes(seat.seatNumber);
+        // Calculate price using seatPriceMap if available, otherwise use seat.extraPrice
+        const extraPrice =
+          seatPriceMap.get(seat.seatNumber) || seat.extraPrice || 0;
         let price = basePrice + extraPrice;
 
         return {
@@ -383,43 +656,132 @@ export default function ShowtimeSelectionScreen() {
   };
 
   const handleSeatToggle = async (seat: Seat) => {
-    if (!selectedShowtime) return;
-
-    if (seat.status === SeatStatus.BOOKED || seat.type === SeatType.EMPTY) {
+    if (!selectedShowtime || !seat.seatNumber) {
       return;
     }
 
-    const seatId = seat.id ?? seat.seatNumber;
+    // Handle couple seats (like POS)
+    let seatsToProcess: any[] = [];
 
-    const isSelected = selectedSeats.some(
-      (s) => s.row === seat.row && s.col === seat.col
+    if (seat.isCoupleSeat && seat.seatNumber.includes("-")) {
+      // Extract individual seat numbers from couple seat number
+      const [start, end] = seat.seatNumber.split("-");
+      const rowLetter = start[0];
+      const startNum = parseInt(start.slice(1));
+      const endNum = parseInt(end);
+
+      // Find both seats in the couple
+      for (let num = startNum; num <= endNum; num++) {
+        const individualSeatNumber = `${rowLetter}${num}`;
+        const seatData = seatMap.get(individualSeatNumber);
+        if (seatData) {
+          seatsToProcess.push(seatData);
+        }
+      }
+    } else {
+      // Regular seat
+      const seatData = seatMap.get(seat.seatNumber);
+      if (seatData) {
+        seatsToProcess.push(seatData);
+      }
+    }
+
+    if (seatsToProcess.length === 0) {
+      return;
+    }
+
+    // Check if any seat is already booked
+    const bookedSeats = seatsToProcess.filter((seatData) =>
+      bookedSeatIds.includes(seatData.id)
+    );
+    if (bookedSeats.length > 0) {
+      showToast("Một hoặc nhiều ghế đã được đặt", "error");
+      return;
+    }
+
+    // Check if all seats are already selected
+    const allSelected = seatsToProcess.every((seatData) =>
+      selectedSeats.some((s) => s.id === seatData.id)
     );
 
     try {
-      if (isSelected) {
-        // Release seat for current user
-        await bookingService.releaseSeat({
-          showtimeId: selectedShowtime.id,
-          seatId: seat.id ?? seatId,
-        });
-
+      if (allSelected) {
+        // Deselect and release all seats
+        const seatIdsToRemove = seatsToProcess.map((s) => s.id);
         setSelectedSeats(
-          selectedSeats.filter((s) => s.row !== seat.row || s.col !== seat.col)
+          selectedSeats.filter((s) => !seatIdsToRemove.includes(s.id))
         );
+        setHeldSeatIds(
+          heldSeatIds.filter((id) => !seatIdsToRemove.includes(id))
+        );
+
+        // Update held seat numbers for display
+        const seatNumbersToRemove = seatsToProcess.map((s) => s.seatNumber);
         setHeldSeatNumbers((prev) =>
-          prev.filter((num) => num !== (seat.id ?? seatId))
+          prev.filter((num) => !seatNumbersToRemove.includes(num))
+        );
+
+        // Release all seats
+        await Promise.all(
+          seatsToProcess.map((seatData) =>
+            bookingService
+              .releaseSeat({
+                showtimeId: selectedShowtime.id,
+                seatId: seatData.id,
+              })
+              .catch(() => {})
+          )
         );
       } else {
+        // Select and hold all seats
         try {
-          await bookingService.holdSeat({
-            showtimeId: selectedShowtime.id,
-            seatId: seat.id ?? seatId,
+          await Promise.all(
+            seatsToProcess.map((seatData) =>
+              bookingService.holdSeat({
+                showtimeId: selectedShowtime.id,
+                seatId: seatData.id,
+              })
+            )
+          );
+
+          // Add seats to selected (convert seatData to Seat format)
+          const newSeats: Seat[] = seatsToProcess.map((seatData) => {
+            // Find the seat in the layout
+            const layoutSeat = rawSeatLayout?.seats
+              .flat()
+              .find((s) => s.seatNumber === seatData.seatNumber);
+
+            // Calculate seat price: basePrice + extraPrice
+            const basePrice = selectedShowtime?.price || 0;
+            const extraPrice =
+              seatData.extraPrice ||
+              seatPriceMap.get(seatData.seatNumber) ||
+              layoutSeat?.extraPrice ||
+              0;
+            const seatPrice = basePrice + extraPrice;
+
+            return {
+              row: layoutSeat?.row ?? 0,
+              col: layoutSeat?.col ?? 0,
+              seatNumber: seatData.seatNumber,
+              type: layoutSeat?.type ?? SeatType.NORMAL,
+              status: SeatStatus.SELECTED,
+              price: seatPrice, // Use calculated price
+              id: seatData.id,
+              extraPrice: extraPrice,
+              isCoupleSeat: layoutSeat?.isCoupleSeat,
+              coupleWith: layoutSeat?.coupleWith,
+            };
           });
 
-          setSelectedSeats([...selectedSeats, seat]);
+          setSelectedSeats([...selectedSeats, ...newSeats]);
+          setHeldSeatIds([...heldSeatIds, ...seatsToProcess.map((s) => s.id)]);
+
+          // Update held seat numbers for display
+          const newHeldNumbers = seatsToProcess.map((s) => s.seatNumber);
           setHeldSeatNumbers((prev) => {
-            const idToUse = seat.id ?? seatId;
-            return prev.includes(idToUse) ? prev : [...prev, idToUse];
+            const updated = [...prev, ...newHeldNumbers];
+            return [...new Set(updated)];
           });
         } catch (error: any) {
           if (error?.response?.status === 409) {
@@ -438,13 +800,44 @@ export default function ShowtimeSelectionScreen() {
   useEffect(() => {
     if (!rawSeatLayout || !selectedShowtime) return;
 
+    // Update seat statuses with both booked and held seats
     const updated = updateSeatStatuses(
       rawSeatLayout,
       bookedSeats,
       selectedShowtime.price
     );
-    setSeatLayout(updated);
-  }, [rawSeatLayout, bookedSeats, heldSeatNumbers, selectedShowtime]);
+
+    // Also mark held seats in the layout
+    const updatedWithHeld = {
+      ...updated,
+      seats: updated.seats.map((row) =>
+        row.map((seat) => {
+          if (seat.type === SeatType.EMPTY || seat.type === SeatType.BLOCKED) {
+            return seat;
+          }
+
+          // Check if seat is held
+          const isHeld = heldSeatNumbers.includes(seat.seatNumber);
+          const isSelected = selectedSeats.some(
+            (s) => s.seatNumber === seat.seatNumber
+          );
+
+          return {
+            ...seat,
+          };
+        })
+      ),
+    };
+
+    setSeatLayout(updatedWithHeld);
+  }, [
+    rawSeatLayout,
+    bookedSeats,
+    heldSeatNumbers,
+    selectedSeats,
+    selectedShowtime,
+    seatPriceMap,
+  ]);
 
   const handleFoodDrinkQuantityChange = (
     foodDrink: FoodDrink,
@@ -483,6 +876,16 @@ export default function ShowtimeSelectionScreen() {
       return;
     }
 
+    // Validate that all selected seats have IDs
+    const seatsWithIds = selectedSeats.filter((s) => s.id);
+    if (seatsWithIds.length !== selectedSeats.length) {
+      showToast(
+        "Một số ghế không có ID hợp lệ. Vui lòng chọn lại ghế.",
+        "error"
+      );
+      return;
+    }
+
     // Navigate to checkout with booking details
     router.push({
       pathname: "/booking/checkout",
@@ -490,13 +893,19 @@ export default function ShowtimeSelectionScreen() {
         showtimeId: selectedShowtime.id,
         movieId: movieId,
         seats: JSON.stringify(selectedSeats.map((s) => s.seatNumber)),
-        seatIds: JSON.stringify(selectedSeats.map((s) => s.id ?? s.seatNumber)),
+        seatIds: JSON.stringify(seatsWithIds.map((s) => s.id!)),
         seatDetails: JSON.stringify(
           selectedSeats.map((s) => ({
             seatNumber: s.seatNumber,
             type: s.type,
             extraPrice: s.extraPrice || 0,
             isCoupleSeat: s.isCoupleSeat || false,
+          }))
+        ),
+        combos: JSON.stringify(
+          selectedFoodDrinks.map((fd) => ({
+            id: fd.id,
+            quantity: fd.quantity,
           }))
         ),
         foodDrinks: JSON.stringify(
@@ -510,93 +919,69 @@ export default function ShowtimeSelectionScreen() {
     });
   };
 
-  const getSeatStyle = (seat: Seat) => {
-    if (seat.type === SeatType.EMPTY) {
-      return "";
-    }
+  // Get seat status and styling (matching frontend design)
+  const getSeatStatus = useCallback(
+    (seat: Seat): "available" | "booked" | "held" | "selected" => {
+      if (!seat.seatNumber || seat.type === SeatType.EMPTY) return "available";
 
-    const isSelected = selectedSeats.some(
-      (s) => s.row === seat.row && s.col === seat.col
-    );
+      // Check if seat is selected by current user first (highest priority)
+      const isSelected = selectedSeats.some(
+        (s) => s.seatNumber === seat.seatNumber || s.id === seat.id
+      );
+      if (isSelected) return "selected";
 
-    const isBooked = bookedSeats.includes(seat.id ?? seat.seatNumber);
-    const isHeldByOther =
-      (seat.id ? heldSeatNumbers.includes(seat.id) : false) && !isSelected;
+      // For couple seats, check all individual seats
+      if (seat.isCoupleSeat && seat.seatNumber.includes("-")) {
+        const [start, end] = seat.seatNumber.split("-");
+        const rowLetter = start[0];
+        const startNum = parseInt(start.slice(1));
+        const endNum = parseInt(end);
 
-    if (isSelected) {
-      return "bg-blue-900 border-blue-500";
-    }
-
-    if (isHeldByOther) {
-      return "bg-yellow-700 border-yellow-500";
-    }
-
-    if (isBooked) {
-      return "bg-red-900 border-red-500";
-    }
-
-    return isDark
-      ? "bg-slate-950 border-slate-600"
-      : "bg-white border-slate-800";
-  };
-
-  useEffect(() => {
-    let isSubscribed = true;
-
-    const handler = async (data: {
-      showtimeId: string;
-      seatId: string;
-      status: "held" | "booked" | "released";
-      expiresAt: number | null;
-    }) => {
-      if (!selectedShowtime || data.showtimeId !== selectedShowtime.id) return;
-
-      try {
-        // Refresh held seats
-        const held = await bookingService.getHeldSeats(data.showtimeId);
-        const newHeldSeatNumbers = held.map((h) => h.seatId);
-        setHeldSeatNumbers(newHeldSeatNumbers);
-
-        if (data.status === "booked") {
-          const booked = await showtimeSelectionService.getBookedSeats(
-            data.showtimeId
-          );
-          setBookedSeats(booked);
-
-          setSelectedSeats((prev) =>
-            prev.filter((s) => s.seatNumber !== data.seatId)
-          );
+        for (let num = startNum; num <= endNum; num++) {
+          const individualSeatNumber = `${rowLetter}${num}`;
+          // Check booked first
+          if (bookedSeats.includes(individualSeatNumber)) return "booked";
+          // Check held
+          if (heldSeatNumbers.includes(individualSeatNumber)) return "held";
         }
-
-        if (data.status === "released") {
-          setSelectedSeats((prev) =>
-            prev.filter((s) => s.seatNumber !== data.seatId)
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Failed to refresh seat data after socket update:",
-          error
-        );
+      } else {
+        // Regular seat - check booked first, then held
+        if (bookedSeats.includes(seat.seatNumber)) return "booked";
+        if (heldSeatNumbers.includes(seat.seatNumber)) return "held";
       }
-    };
 
-    (async () => {
-      const socket = await getSocket();
-      if (!isSubscribed) return;
-      socket.on("seat-update", handler);
-    })();
+      return "available";
+    },
+    [bookedSeats, heldSeatNumbers, selectedSeats]
+  );
 
-    return () => {
-      isSubscribed = false;
-      (async () => {
-        try {
-          const socket = await getSocket();
-          socket.off("seat-update", handler);
-        } catch {}
-      })();
-    };
-  }, [selectedShowtime]);
+  const getSeatStyle = (
+    seat: Seat,
+    status: "available" | "booked" | "held" | "selected"
+  ) => {
+    if (seat.type === SeatType.EMPTY) {
+      return isDark
+        ? "bg-slate-800/30 border-slate-700/30"
+        : "bg-slate-100/50 border-slate-200/50";
+    }
+
+    if (seat.type === SeatType.BLOCKED) {
+      return "bg-slate-400 border-slate-500 opacity-50";
+    }
+
+    switch (status) {
+      case "booked":
+        return "bg-red-100 border-red-500";
+      case "held":
+        return "bg-yellow-100 border-yellow-500";
+      case "selected":
+        return "bg-blue-100 border-blue-500";
+      default:
+        return isDark
+          ? "bg-white border-slate-800"
+          : "bg-white border-slate-800";
+    }
+  };
 
   // Join/leave showtime room when selection changes
   useEffect(() => {
@@ -626,6 +1011,108 @@ export default function ShowtimeSelectionScreen() {
     };
   }, [selectedShowtime]);
 
+  // Listen for real-time seat updates from server (socket.io) - fetch held and booked seats
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const handler = async (data: {
+      showtimeId: string;
+      seatId: string;
+      status: "held" | "booked" | "released";
+      expiresAt: number | null;
+    }) => {
+      if (!selectedShowtime || data.showtimeId !== selectedShowtime.id) return;
+
+      try {
+        // Always re-fetch both held and booked seats on any seat-update event
+        const [heldSeatsResponse, bookedSeatsResponse] = await Promise.all([
+          bookingService.getHeldSeats(data.showtimeId),
+          bookingService.getBookedSeats(data.showtimeId),
+        ]);
+
+        // Update held seats
+        const newHeldSeatIds = heldSeatsResponse.data.map((h) => h.seatId);
+        setHeldSeatIds(newHeldSeatIds);
+
+        // Update held seat numbers for display
+        const newHeldNumbers: string[] = [];
+        newHeldSeatIds.forEach((seatId) => {
+          const seat = Array.from(seatMap.values()).find(
+            (s) => s.id === seatId
+          );
+          if (seat && seat.seatNumber) {
+            newHeldNumbers.push(seat.seatNumber);
+          }
+        });
+        setHeldSeatNumbers(newHeldNumbers);
+
+        // Update booked seats
+        const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
+          ? bookedSeatsResponse.data
+              .map((booking: any) => booking.seatId)
+              .filter((id: any) => Boolean(id))
+          : [];
+        setBookedSeatIds(bookedIds);
+
+        // Update booked seat numbers for display
+        const bookedNumbers: string[] = [];
+        bookedIds.forEach((seatId) => {
+          const seat = Array.from(seatMap.values()).find(
+            (s) => s.id === seatId
+          );
+          if (seat && seat.seatNumber) {
+            bookedNumbers.push(seat.seatNumber);
+          }
+        });
+        setBookedSeats(bookedNumbers);
+
+        // Handle specific status changes
+        if (data.status === "booked") {
+          // Remove from selected seats if it was selected
+          setSelectedSeats((prev) =>
+            prev.filter((seat) => seat.id !== data.seatId)
+          );
+        } else if (data.status === "released") {
+          // Check if the seat is no longer held
+          if (!newHeldSeatIds.includes(data.seatId)) {
+            // Remove from selected seats only if it's no longer held
+            setSelectedSeats((prev) => {
+              const seat = prev.find((s) => s.id === data.seatId);
+              // Only remove if the seat exists and is no longer held
+              if (seat && !newHeldSeatIds.includes(data.seatId)) {
+                return prev.filter((s) => s.id !== data.seatId);
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Failed to refresh seat data after socket update:",
+          error
+        );
+      }
+    };
+
+    (async () => {
+      const socket = await getSocket();
+      if (!isSubscribed) return;
+      socket.on("seat-update", handler);
+    })();
+
+    return () => {
+      isSubscribed = false;
+      (async () => {
+        try {
+          const socket = await getSocket();
+          socket.off("seat-update", handler);
+        } catch {
+          // ignore cleanup errors
+        }
+      })();
+    };
+  }, [selectedShowtime, seatMap]);
+
   // Release seats when switching showtime
   useEffect(() => {
     return () => {
@@ -653,7 +1140,6 @@ export default function ShowtimeSelectionScreen() {
   const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
   const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
   const borderColor = isDark ? "border-slate-800" : "border-slate-200";
-  const borderColorLight = isDark ? "border-slate-700" : "border-slate-300";
   const textColor = isDark ? "text-white" : "text-slate-900";
   const textMuted = isDark ? "text-slate-400" : "text-slate-600";
   const iconColor = isDark ? "#fff" : "#0f172a";
@@ -673,7 +1159,7 @@ export default function ShowtimeSelectionScreen() {
 
   return (
     <SafeAreaView className={`flex-1 ${bgColor}`} edges={["top"]}>
-      {/* Timer*/}
+      {/* Timer in top right corner - shows when timer is active */}
       {timerActive && (
         <View
           className="absolute top-16 right-4 z-50"
@@ -745,334 +1231,482 @@ export default function ShowtimeSelectionScreen() {
                 key={index}
                 className={`px-4 py-3 mr-3 rounded-xl border-2 ${
                   selectedDate?.fullDate === date.fullDate
-                    ? "bg-red-600 border-red-600"
-                    : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
+                    ? "border-red-600 bg-red-50 dark:bg-red-900/20"
+                    : `${borderColor} ${cardBg}`
                 }`}
                 onPress={() => handleDateSelect(date)}
               >
                 <Text
-                  className={`text-sm font-semibold mb-1 ${
+                  className={`text-center ${
                     selectedDate?.fullDate === date.fullDate
-                      ? "text-white"
+                      ? "text-red-600 font-bold"
                       : textMuted
                   }`}
                 >
                   {date.dayOfWeek}
                 </Text>
                 <Text
-                  className={`text-lg font-bold ${
+                  className={`text-center text-lg font-bold ${
                     selectedDate?.fullDate === date.fullDate
-                      ? "text-white"
+                      ? "text-red-600"
                       : textColor
                   }`}
                 >
-                  {date.dayOfMonth.includes("/")
-                    ? date.dayOfMonth.split(", ")[1] || date.dayOfMonth
-                    : date.dayOfMonth}
+                  {date.dayOfMonth}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
 
-          {/* Time Selection */}
-          {selectedDate && (
-            <View className="px-4 mt-4">
-              {filteredShowtimes.length === 0 ? (
-                <View className="flex items-center justify-center h-64">
-                  <Text className={`${textMuted} text-center py-4`}>
-                    Không có suất chiếu cho ngày này
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="flex-row flex-wrap"
-                >
-                  {filteredShowtimes.map((showtime) => (
+        {/* Showtime Selection */}
+        {selectedDate && (
+          <View className={`py-5 border-b ${borderColor}`}>
+            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+              Chọn Giờ Chiếu
+            </Text>
+            {filteredShowtimes.length === 0 ? (
+              <Text className={`${textMuted} text-center py-4`}>
+                Không có suất chiếu cho ngày đã chọn
+              </Text>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="px-4"
+              >
+                {filteredShowtimes.map((showtime) => {
+                  const isSelected = selectedShowtime?.id === showtime.id;
+                  const startTime = new Date(showtime.startTime);
+                  const endTime = new Date(showtime.endTime);
+
+                  return (
                     <TouchableOpacity
                       key={showtime.id}
-                      className={`px-5 py-3 mr-3 mb-3 rounded-xl border-2 ${
-                        selectedShowtime?.id === showtime.id
-                          ? "bg-red-600 border-red-600"
-                          : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
+                      className={`px-4 py-3 mr-3 rounded-xl border-2 ${
+                        isSelected
+                          ? "border-red-600 bg-red-50 dark:bg-red-900/20"
+                          : `${borderColor} ${cardBg}`
                       }`}
                       onPress={() => handleShowtimeSelect(showtime)}
                     >
                       <Text
-                        className={`text-base font-bold ${
-                          selectedShowtime?.id === showtime.id
-                            ? "text-white"
-                            : textColor
+                        className={`text-center font-bold ${
+                          isSelected ? "text-red-600" : textColor
                         }`}
                       >
-                        {new Date(showtime.startTime).toLocaleTimeString(
-                          "vi-VN",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: false,
-                          }
-                        )}
+                        {startTime.toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}
+                      </Text>
+                      <Text
+                        className={`text-center text-xs mt-1 ${
+                          isSelected ? "text-red-600/80" : textMuted
+                        }`}
+                      >
+                        {showtime.language} • {showtime.format}
+                      </Text>
+                      <Text
+                        className={`text-center text-xs mt-1 font-semibold ${
+                          isSelected ? "text-red-600" : textColor
+                        }`}
+                      >
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(showtime.price)}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-          )}
-        </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
-        {/* Seat Selection Section */}
+        {/* Seat Selection */}
         {selectedShowtime && (
           <View className={`py-5 border-b ${borderColor}`}>
             <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
-              Chọn Ghế Ngồi
+              Chọn Ghế {room?.name && `- ${room.name}`}
             </Text>
-
             {loadingSeatMap ? (
-              <View className="py-10 items-center">
+              <View className="py-8 items-center">
                 <ActivityIndicator size="large" color="#e11d48" />
+                <Text className={`${textMuted} mt-4`}>
+                  Đang tải sơ đồ ghế...
+                </Text>
               </View>
-            ) : seatLayout && seatLayout.seats.length > 0 ? (
-              <>
+            ) : seatLayout ? (
+              <View className="px-4">
                 {/* Legend */}
-                <View className="flex flex-row flex-wrap justify-center mt-2 px-8 items-center mb-4">
-                  <View className="w-1/2 flex-row items-center gap-2 mb-2 px-1">
-                    <View className="w-4 h-4 bg-white-900 border-2 border-slate-600 rounded" />
-                    <Text className={`text-xs ${textMuted}`}>Còn trống</Text>
+                <View className="flex-row flex-wrap justify-center gap-4 mb-4">
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 bg-white border-2 border-slate-800 rounded" />
+                    <Text className={`${textMuted} text-xs`}>Còn trống</Text>
                   </View>
-                  <View className="w-1/2 flex-row items-center gap-2 mb-2 px-1">
+                  <View className="flex-row items-center gap-2">
                     <View className="w-4 h-4 bg-blue-900 border-2 border-blue-500 rounded" />
-                    <Text className={`text-xs ${textMuted}`}>Đã chọn</Text>
+                    <Text className={`${textMuted} text-xs`}>Đang chọn</Text>
                   </View>
-                  <View className="w-1/2 flex-row items-center gap-2 mb-2 px-1">
+                  <View className="flex-row items-center gap-2">
                     <View className="w-4 h-4 bg-yellow-700 border-2 border-yellow-500 rounded" />
-                    <Text className={`text-xs ${textMuted}`}>
-                      Đã giữ bởi người khác
+                    <Text className={`${textMuted} text-xs`}>Đã giữ</Text>
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    <View className="w-4 h-4 bg-red-900 border-2 border-red-500 rounded" />
+                    <Text className={`${textMuted} text-xs`}>Đã đặt</Text>
+                  </View>
+                </View>
+
+                {/* Screen indicator */}
+                <View className="mb-6 items-center">
+                  <View
+                    className={`px-6 py-2 rounded-full ${
+                      isDark ? "bg-slate-800" : "bg-slate-800"
+                    }`}
+                  >
+                    <Text className="text-white text-sm font-semibold">
+                      MÀN HÌNH
                     </Text>
                   </View>
-                  <View className="w-1/2 flex-row items-center gap-2 mb-2 px-1">
-                    <View className="w-4 h-4 bg-red-900 border-2 border-red-500 rounded" />
-                    <Text className={`text-xs ${textMuted}`}>Đã đặt</Text>
-                  </View>
                 </View>
 
-                {/* Screen Indicator */}
-                <View className="items-center mb-6 px-4">
-                  <View className="w-full h-1 bg-slate-700 rounded mb-2" />
-                  <Text
-                    className={`text-xs font-semibold ${textMuted} tracking-wider`}
-                  >
-                    MÀN HÌNH
-                  </Text>
-                </View>
+                {/* Seat Grid Container */}
+                <View
+                  className={`rounded-lg border-2 border-dashed ${
+                    isDark
+                      ? "border-slate-700 bg-slate-900/50"
+                      : "border-slate-300 bg-slate-50"
+                  } p-4`}
+                >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View>
+                      {/* Seat rows */}
+                      {seatLayout.seats.map((row, rowIndex) => {
+                        const rowLetter = String.fromCharCode(65 + rowIndex);
+                        return (
+                          <View
+                            key={rowIndex}
+                            className="flex-row items-center mb-1"
+                          >
+                            {/* Row label (left) */}
+                            <View className="w-8 h-12 items-center justify-center mr-2">
+                              <Text
+                                className={`${textMuted} text-sm font-bold`}
+                              >
+                                {rowLetter}
+                              </Text>
+                            </View>
 
-                {/* Seat Grid */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="px-4 items-center">
-                    {seatLayout.seats.map((row, rowIndex) => (
-                      <View
-                        key={rowIndex}
-                        className="flex-row mb-2 justify-center"
-                      >
-                        {row.map((seat, colIndex) => {
-                          // For couple seats, render a single wide button for the pair,
-                          // skipping the secondary cell
-                          const isCoupleSeat =
-                            seat.type === SeatType.COUPLE && seat.isCoupleSeat;
-                          const isCoupleSecondary =
-                            isCoupleSeat &&
-                            typeof seat.coupleWith === "number" &&
-                            seat.coupleWith < colIndex;
-                          const isCouplePrimary =
-                            isCoupleSeat &&
-                            typeof seat.coupleWith === "number" &&
-                            seat.coupleWith > colIndex;
+                            {/* Seats in row */}
+                            <View className="flex-row gap-1">
+                              {row.map((seat, colIndex) => {
+                                // Skip rendering the right seat of a couple
+                                if (
+                                  seat.isCoupleSeat &&
+                                  seat.coupleWith !== undefined &&
+                                  seat.col > seat.coupleWith
+                                ) {
+                                  return null;
+                                }
 
-                          if (isCoupleSecondary) {
-                            return null;
-                          }
+                                const isCoupleLeft =
+                                  seat.isCoupleSeat &&
+                                  seat.coupleWith !== undefined &&
+                                  seat.col < seat.coupleWith;
 
-                          const seatStyle = getSeatStyle(seat);
-                          const isSelected = selectedSeats.some(
-                            (s) => s.row === seat.row && s.col === seat.col
-                          );
+                                const status = getSeatStatus(seat);
+                                const seatStyle = getSeatStyle(seat, status);
+                                const disabled =
+                                  seat.type === SeatType.EMPTY ||
+                                  seat.type === SeatType.BLOCKED ||
+                                  status === "booked";
 
-                          const isBooked = bookedSeats.includes(
-                            seat.id ?? seat.seatNumber
-                          );
-                          const isHeldByOther =
-                            (seat.id
-                              ? heldSeatNumbers.includes(seat.id)
-                              : false) && !isSelected;
+                                // Determine icon and text colors based on status
+                                let iconColor = "#1f2937"; // gray-800
+                                let textColor = "#1f2937"; // gray-800
+                                if (status === "booked") {
+                                  iconColor = "#ef4444"; // red-500
+                                  textColor = "#ef4444";
+                                } else if (status === "held") {
+                                  iconColor = "#eab308"; // yellow-500
+                                  textColor = "#eab308";
+                                } else if (status === "selected") {
+                                  iconColor = "#3b82f6"; // blue-500
+                                  textColor = "#3b82f6";
+                                }
 
-                          const disabled =
-                            seat.type === SeatType.EMPTY ||
-                            seat.type === SeatType.BLOCKED ||
-                            isBooked ||
-                            isHeldByOther;
+                                if (isCoupleLeft) {
+                                  return (
+                                    <TouchableOpacity
+                                      key={`${rowIndex}-${colIndex}`}
+                                      className={`h-12 rounded-lg border-2 ${seatStyle} ${
+                                        disabled ? "opacity-75" : ""
+                                      }`}
+                                      style={{ width: 100 }}
+                                      onPress={() => handleSeatToggle(seat)}
+                                      disabled={disabled}
+                                    >
+                                      <View className="flex-1 items-center justify-center">
+                                        <MaterialCommunityIcons
+                                          name="sofa"
+                                          size={16}
+                                          color={iconColor}
+                                        />
+                                        <Text
+                                          className={`text-[10px] font-bold mt-0.5`}
+                                          style={{ color: textColor }}
+                                        >
+                                          {seat.seatNumber}
+                                        </Text>
+                                      </View>
+                                    </TouchableOpacity>
+                                  );
+                                }
 
-                          const baseWidth = isCouplePrimary ? "w-16" : "w-8";
-                          const iconColor = isDark ? "#e5e7eb" : "#0f172a";
-                          const textColorClass = isDark
-                            ? "text-slate-50"
-                            : "text-slate-900";
-
-                          return (
-                            <TouchableOpacity
-                              key={`${rowIndex}-${colIndex}`}
-                              className={`h-8 mx-1 rounded border ${baseWidth} ${seatStyle}`}
-                              onPress={() => handleSeatToggle(seat)}
-                              disabled={disabled}
-                            >
-                              {seat.type !== SeatType.EMPTY && (
-                                <View className="flex-1 flex-col items-center p-1 justify-center">
-                                  {seat.type === SeatType.VIP && (
-                                    <FontAwesome6
-                                      name="crown"
-                                      size={10}
-                                      color={iconColor}
-                                    />
-                                  )}
-                                  {seat.type === SeatType.COUPLE && (
-                                    <FontAwesome
-                                      name="heart"
-                                      size={10}
-                                      color={iconColor}
-                                    />
-                                  )}
-                                  <Text
-                                    className={`text-[10px] font-semibold ${textColorClass}`}
+                                // Regular seat or empty cell
+                                return (
+                                  <TouchableOpacity
+                                    key={`${rowIndex}-${colIndex}`}
+                                    className={`w-12 h-12 rounded-lg border-2 ${seatStyle} ${
+                                      disabled ? "opacity-75" : ""
+                                    }`}
+                                    onPress={() =>
+                                      !disabled && handleSeatToggle(seat)
+                                    }
+                                    disabled={disabled}
                                   >
-                                    {seat.seatNumber}
-                                  </Text>
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
+                                    {seat.type === SeatType.EMPTY ? (
+                                      <View className="flex-1 items-center justify-center">
+                                        <Text
+                                          className={`text-[10px] font-mono ${
+                                            isDark
+                                              ? "text-slate-500"
+                                              : "text-slate-400"
+                                          }`}
+                                        >
+                                          {rowLetter}
+                                          {colIndex + 1}
+                                        </Text>
+                                      </View>
+                                    ) : seat.type === SeatType.BLOCKED ? (
+                                      <View className="flex-1 items-center justify-center">
+                                        <Ionicons
+                                          name="close"
+                                          size={16}
+                                          color={iconColor}
+                                        />
+                                      </View>
+                                    ) : (
+                                      <View className="flex-1 items-center justify-center">
+                                        {seat.type === SeatType.VIP && (
+                                          <FontAwesome6
+                                            name="crown"
+                                            size={14}
+                                            color={iconColor}
+                                            style={{ marginBottom: 2 }}
+                                          />
+                                        )}
+                                        {seat.type === SeatType.NORMAL && (
+                                          <MaterialCommunityIcons
+                                            name="sofa-single"
+                                            size={16}
+                                            color={iconColor}
+                                            style={{ marginBottom: 2 }}
+                                          />
+                                        )}
+                                        {seat.seatNumber && (
+                                          <Text
+                                            className={`text-[10px] font-bold leading-none mt-0.5`}
+                                            style={{ color: textColor }}
+                                          >
+                                            {seat.seatNumber}
+                                          </Text>
+                                        )}
+                                      </View>
+                                    )}
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+
+                            {/* Row label (right) */}
+                            <View className="w-8 h-12 items-center justify-center ml-2">
+                              <Text
+                                className={`${textMuted} text-sm font-bold`}
+                              >
+                                {rowLetter}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+
+                      {/* Column numbers */}
+                      <View className="flex-row items-center mt-2">
+                        <View className="w-8 mr-2" />
+                        {Array.from({ length: seatLayout.cols }, (_, index) => (
+                          <View
+                            key={index}
+                            className="w-12 h-6 items-center justify-center"
+                          >
+                            <Text className={`${textMuted} text-xs font-bold`}>
+                              {index + 1}
+                            </Text>
+                          </View>
+                        ))}
+                        <View className="w-8 ml-2" />
                       </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              </>
+                    </View>
+                  </ScrollView>
+                </View>
+              </View>
             ) : (
               <Text className={`${textMuted} text-center py-4`}>
-                Không có sơ đồ ghế
+                Chưa có sơ đồ ghế
               </Text>
             )}
           </View>
         )}
 
-        {/* Combo Selection Section */}
-        <View className={`py-5 border-b ${borderColor}`}>
-          <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
-            Chọn Bắp Nước
-          </Text>
-
-          {loadingFoodDrinks ? (
-            <View className="py-10 items-center">
-              <ActivityIndicator size="large" color="#e11d48" />
-            </View>
-          ) : (
-            <View className="px-4">
+        {/* Food/Drinks Selection */}
+        {selectedShowtime && foodDrinks.length > 0 && (
+          <View className={`py-5 border-b ${borderColor}`}>
+            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+              Đồ Ăn & Nước Uống
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="px-4"
+            >
               {foodDrinks.map((foodDrink) => {
                 const quantity = getFoodDrinkQuantity(foodDrink.id);
                 return (
                   <View
                     key={foodDrink.id}
-                    className={`flex-row items-center mb-4 p-4 ${cardBg} rounded-xl`}
+                    className={`mr-4 ${cardBg} rounded-xl p-3 border ${borderColor}`}
+                    style={{ width: 140 }}
                   >
-                    <Image
-                      source={{ uri: foodDrink.image }}
-                      className="w-20 h-20 rounded-lg mr-4"
-                      resizeMode="cover"
-                    />
-                    <View className="flex-1">
-                      <Text
-                        className={`${textColor} font-semibold text-base mb-1`}
-                      >
-                        {foodDrink.name}
-                      </Text>
-                      <Text className={`${textMuted} text-sm mb-2`}>
-                        {foodDrink.description}
-                      </Text>
-                      <Text className="text-red-500 font-bold text-base">
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(foodDrink.price)}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center gap-3">
+                    {foodDrink.image && (
+                      <Image
+                        source={{ uri: foodDrink.image }}
+                        className="w-full h-24 rounded-lg mb-2"
+                        resizeMode="cover"
+                      />
+                    )}
+                    <Text
+                      className={`${textColor} font-semibold text-sm mb-1`}
+                      numberOfLines={2}
+                    >
+                      {foodDrink.name}
+                    </Text>
+                    <Text className={`${textMuted} text-xs mb-2`}>
+                      {new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
+                      }).format(foodDrink.price)}
+                    </Text>
+                    <View className="flex-row items-center justify-between">
                       <TouchableOpacity
-                        className={`w-8 h-8 rounded-full ${isDark ? "bg-slate-700" : "bg-slate-300"} items-center justify-center`}
+                        className={`w-8 h-8 rounded-lg items-center justify-center ${
+                          quantity > 0
+                            ? "bg-red-600"
+                            : isDark
+                              ? "bg-slate-700"
+                              : "bg-slate-300"
+                        }`}
                         onPress={() =>
                           handleFoodDrinkQuantityChange(foodDrink, -1)
                         }
                         disabled={quantity === 0}
                       >
-                        <Text className={textColor + " font-bold text-lg"}>
-                          -
-                        </Text>
+                        <Ionicons
+                          name="remove"
+                          size={16}
+                          color={quantity > 0 ? "#fff" : iconColor}
+                        />
                       </TouchableOpacity>
-                      <Text
-                        className={`${textColor} font-semibold text-base w-8 text-center`}
-                      >
+                      <Text className={`${textColor} font-bold mx-2`}>
                         {quantity}
                       </Text>
                       <TouchableOpacity
-                        className="w-8 h-8 rounded-full bg-red-600 items-center justify-center"
+                        className="w-8 h-8 bg-red-600 rounded-lg items-center justify-center"
                         onPress={() =>
                           handleFoodDrinkQuantityChange(foodDrink, 1)
                         }
                       >
-                        <Text className="text-white font-bold text-lg">+</Text>
+                        <Ionicons name="add" size={16} color="#fff" />
                       </TouchableOpacity>
                     </View>
                   </View>
                 );
               })}
-              {foodDrinks.length === 0 && (
-                <Text className={`${textMuted} text-center py-4`}>
-                  Không có bắp nước nào
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Summary */}
+        {(selectedSeats.length > 0 || selectedFoodDrinks.length > 0) && (
+          <View className={`mx-4 mt-4 mb-4 ${cardBg} rounded-xl p-4`}>
+            <Text className={`${textColor} font-bold text-lg mb-3`}>
+              Tóm Tắt
+            </Text>
+            {selectedSeats.length > 0 && (
+              <View className="mb-3">
+                <Text className={`${textMuted} text-sm mb-2`}>
+                  Ghế đã chọn:
                 </Text>
-              )}
+                <Text className={`${textColor} font-semibold`}>
+                  {selectedSeats.map((s) => s.seatNumber).join(", ")}
+                </Text>
+              </View>
+            )}
+            {selectedFoodDrinks.length > 0 && (
+              <View className="mb-3">
+                <Text className={`${textMuted} text-sm mb-2`}>Đồ ăn/uống:</Text>
+                {selectedFoodDrinks.map((fd) => (
+                  <Text key={fd.id} className={`${textColor} text-sm`}>
+                    {fd.foodDrink.name} x {fd.quantity}
+                  </Text>
+                ))}
+              </View>
+            )}
+            <View className="flex-row justify-between mt-3 pt-3 border-t border-slate-600/30">
+              <Text className={`${textColor} font-bold text-lg`}>Tổng:</Text>
+              <Text className={`${textColor} font-bold text-lg`}>
+                {new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
+                }).format(totalPrice)}
+              </Text>
             </View>
-          )}
-        </View>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Footer */}
-      <View
-        className={`absolute bottom-0 left-0 right-0 ${cardBgSecondary} border-t ${borderColor} pb-5`}
-      >
-        <View className="px-4 pt-4">
-          <View className="mb-3">
-            <Text className={`${textMuted} text-sm mb-1`}>
-              Ghế: {selectedSeatNumbers || "Chưa chọn"} ({selectedSeats.length})
-            </Text>
-            {selectedFoodDrinks.length > 0 && (
-              <Text className={`${textMuted} text-sm mb-1`}>
-                Bắp Nước: x
-                {selectedFoodDrinks.reduce((sum, fd) => sum + fd.quantity, 0)}
-              </Text>
-            )}
-          </View>
+      {/* Proceed to Checkout Button */}
+      {selectedSeats.length > 0 && (
+        <View
+          className={`absolute bottom-0 left-0 right-0 px-4 pb-5 pt-3 ${cardBgSecondary} border-t ${borderColor}`}
+        >
           <TouchableOpacity
-            className={`py-4 rounded-xl items-center ${
-              selectedSeats.length === 0
-                ? `${isDark ? "bg-slate-700" : "bg-slate-300"} opacity-50`
-                : "bg-red-600"
-            }`}
+            className="bg-red-600 py-4 rounded-xl items-center"
             onPress={handleProceedToCheckout}
-            disabled={selectedSeats.length === 0}
           >
-            <Text className="text-white font-bold text-base">Thanh toán</Text>
+            <Text className="text-white font-bold text-base">
+              Tiếp Tục -{" "}
+              {new Intl.NumberFormat("vi-VN", {
+                style: "currency",
+                currency: "VND",
+              }).format(totalPrice)}
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      )}
     </SafeAreaView>
   );
 }

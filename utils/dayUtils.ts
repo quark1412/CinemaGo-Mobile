@@ -17,10 +17,7 @@ export const generateDateOptions = (): DateOption[] => {
     options.push({
       date,
       dayOfWeek,
-      dayOfMonth:
-        i === 0
-          ? `${dayOfMonth}/${month}`
-          : `${dayOfWeek}, ${dayOfMonth}/${month}`,
+      dayOfMonth: `${dayOfMonth}/${month}`,
       fullDate,
     });
   }

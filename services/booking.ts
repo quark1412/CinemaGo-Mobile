@@ -71,19 +71,45 @@ export const bookingService = {
     foodDrinks?: Array<{ id: string; quantity: number }>
   ) => {
     try {
-      const foodDrinksData = foodDrinks
-        ? foodDrinks.map((fd) => ({
-            foodDrinkId: fd.id,
-            quantity: fd.quantity,
-          }))
-        : undefined;
+      // Validate seatIds
+      if (!seatIds || seatIds.length === 0) {
+        throw new Error("Seat IDs are required");
+      }
 
-      const response = await axiosConfig.post(`/bookings`, {
-        type: "online",
+      // Filter out any invalid seat IDs
+      const validSeatIds = seatIds.filter(
+        (id): id is string => !!id && typeof id === "string" && id.trim() !== ""
+      );
+
+      if (validSeatIds.length === 0) {
+        throw new Error("No valid seat IDs provided");
+      }
+
+      const foodDrinksData =
+        foodDrinks && foodDrinks.length > 0
+          ? foodDrinks.map((fd) => ({
+              foodDrinkId: fd.id,
+              quantity: fd.quantity,
+            }))
+          : [];
+
+      console.log("Sending booking request:", {
         showtimeId,
-        seatIds,
+        seatIds: validSeatIds,
         foodDrinks: foodDrinksData,
       });
+
+      const response = await axiosConfig.post(
+        `/bookings`,
+        {
+          showtimeId,
+          seatIds: validSeatIds,
+          foodDrinks: foodDrinksData,
+        },
+        {
+          requiresAuth: true,
+        } as any
+      );
 
       // Transform the response data to ensure dates are properly converted
       const booking = {
@@ -99,9 +125,7 @@ export const bookingService = {
 
       return booking;
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to create booking"
-      );
+      throw error;
     }
   },
 
@@ -148,10 +172,12 @@ export const bookingService = {
   },
 
   // Get all held seats for a showtime
-  getHeldSeats: async (showtimeId: string): Promise<HeldSeat[]> => {
+  getHeldSeats: async (showtimeId: string): Promise<{ data: HeldSeat[] }> => {
     try {
-      const response = await axiosConfig.get(`/rooms/${showtimeId}/hold-seat`);
-      return response.data.data as HeldSeat[];
+      const response = await axiosConfig.get(`/rooms/${showtimeId}/hold-seat`, {
+        requiresAuth: true,
+      } as any);
+      return response.data;
     } catch (error: any) {
       throw error;
     }

@@ -21,8 +21,6 @@ import { useTheme } from "@/contexts/themeContext";
 
 type PaymentMethod = "COD" | "MOMO";
 
-const TRANSACTION_TIMEOUT_MINUTES = 5;
-
 export default function CheckoutScreen() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -56,42 +54,14 @@ export default function CheckoutScreen() {
   >({});
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>("COD");
-  const [timeRemaining, setTimeRemaining] = useState({
-    minutes: TRANSACTION_TIMEOUT_MINUTES,
-    seconds: 0,
-  });
-  const [bookingId, setBookingId] = useState<string | null>(null);
 
   const selectedSeats = seats ? JSON.parse(seats) : [];
   const seatDetailsData = seatDetails ? JSON.parse(seatDetails) : [];
   const foodDrinkData = foodDrinks ? JSON.parse(foodDrinks) : [];
-  const totalAmount = totalPrice ? parseFloat(totalPrice) : 0;
 
   useEffect(() => {
     loadCheckoutData();
   }, []);
-
-  // Countdown timer
-  useEffect(() => {
-    if (bookingId) {
-      const interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev.seconds > 0) {
-            return { ...prev, seconds: prev.seconds - 1 };
-          } else if (prev.minutes > 0) {
-            return { minutes: prev.minutes - 1, seconds: 59 };
-          } else {
-            clearInterval(interval);
-            showToast("Giao dịch đã hết hạn", "error");
-            router.back();
-            return { minutes: 0, seconds: 0 };
-          }
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [bookingId]);
 
   useEffect(() => {
     if (foodDrinkData.length > 0) {
@@ -119,20 +89,6 @@ export default function CheckoutScreen() {
         );
         setCinema(cinemaData);
       }
-
-      // Create booking
-      const seatIdsArray = seatIds ? JSON.parse(seatIds) : selectedSeats;
-      const foodDrinks = foodDrinkData.map((fd: any) => ({
-        id: fd.id,
-        quantity: fd.quantity,
-      }));
-
-      const booking = await bookingService.createBooking(
-        showtimeId,
-        seatIdsArray,
-        foodDrinks
-      );
-      setBookingId(booking.id);
     } catch (error: any) {
       showToast(error.message || "Failed to load checkout data", "error");
       router.back();
@@ -160,34 +116,81 @@ export default function CheckoutScreen() {
   };
 
   const handlePayment = async () => {
-    if (!bookingId) {
-      showToast("Đang xử lý đặt vé...", "error");
+    if (!showtime || selectedSeats.length === 0) {
+      showToast("Vui lòng chọn ghế", "error");
       return;
     }
 
     try {
       setProcessing(true);
 
+      // Create booking
+      const seatIdsArray = seatIds ? JSON.parse(seatIds) : [];
+
+      // Validate seatIds
+      if (!seatIdsArray || seatIdsArray.length === 0) {
+        showToast("Vui lòng chọn ghế", "error");
+        setProcessing(false);
+        return;
+      }
+
+      // Filter out any invalid seat IDs
+      const validSeatIds = seatIdsArray.filter(
+        (id: any) => id && typeof id === "string" && id.trim() !== ""
+      );
+
+      if (validSeatIds.length === 0) {
+        showToast("Không có ghế hợp lệ để đặt", "error");
+        setProcessing(false);
+        return;
+      }
+
+      const foodDrinks =
+        foodDrinkData.length > 0
+          ? foodDrinkData.map((fd: any) => ({
+              id: fd.id,
+              quantity: fd.quantity,
+            }))
+          : undefined;
+
+      console.log("Creating booking with:", {
+        showtimeId,
+        seatIds: validSeatIds,
+        foodDrinks,
+      });
+
+      const booking = await bookingService.createBooking(
+        showtimeId,
+        validSeatIds,
+        foodDrinks
+      );
+
       switch (selectedPaymentMethod) {
         case "COD": {
-          router.push("/booking/success" as any);
+          router.push({
+            pathname: "/booking/success",
+            params: {
+              bookingId: booking.id,
+              amount: totalAmount.toString(),
+              method: "COD",
+            },
+          } as any);
           return;
         }
         case "MOMO": {
           const momoResponse = await paymentService.checkoutWithMoMo(
             totalAmount,
-            bookingId
+            booking.id
           );
 
           const paymentUrl = momoResponse.URL;
 
+          // Persist identifiers for the booking completed screen
           try {
             if (momoResponse.paymentId) {
               await AsyncStorage.setItem("paymentId", momoResponse.paymentId);
             }
-            if (bookingId) {
-              await AsyncStorage.setItem("bookingId", bookingId);
-            }
+            await AsyncStorage.setItem("bookingId", booking.id);
           } catch (storageError) {
             console.warn("Failed to persist payment identifiers", storageError);
           }
@@ -202,17 +205,15 @@ export default function CheckoutScreen() {
         }
       }
     } catch (error: any) {
-      showToast(error.message || "Failed to process payment", "error");
+      showToast(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to process payment",
+        "error"
+      );
     } finally {
       setProcessing(false);
     }
-  };
-
-  const formatTime = (minutes: number, seconds: number) => {
-    return {
-      minutes: minutes.toString().padStart(2, "0"),
-      seconds: seconds.toString().padStart(2, "0"),
-    };
   };
 
   // Calculate ticket price with extraPrice for VIP and couple seats
@@ -224,6 +225,7 @@ export default function CheckoutScreen() {
 
     seatDetailsData.forEach((seat: any) => {
       const seatPrice = basePrice + (seat.extraPrice || 0);
+      // For couple seats, add extraPrice to each seat
       if (seat.isCoupleSeat) {
         totalSeatPrice += seatPrice * 2;
       } else {
@@ -242,7 +244,11 @@ export default function CheckoutScreen() {
     }, 0);
   }, [selectedFoodDrinks, foodDrinkQuantities]);
 
-  // Theme-aware colors
+  // Calculate total amount
+  const totalAmount = useMemo(() => {
+    return ticketPrice + foodDrinksTotal;
+  }, [ticketPrice, foodDrinksTotal]);
+
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
   const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
   const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
@@ -263,8 +269,6 @@ export default function CheckoutScreen() {
     );
   }
 
-  const timeDisplay = formatTime(timeRemaining.minutes, timeRemaining.seconds);
-
   return (
     <SafeAreaView className={`flex-1 ${bgColor}`} edges={["top"]}>
       {/* Header */}
@@ -283,29 +287,6 @@ export default function CheckoutScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
-        {/* Countdown Timer */}
-        {bookingId && (
-          <View className={`px-4 py-4 border-b ${borderColor}`}>
-            <Text className={`${textMuted} text-sm text-center mb-3`}>
-              Giao dịch sẽ hết hạn sau
-            </Text>
-            <View className="flex-row justify-center gap-3">
-              <View className={`${cardBg} rounded-xl px-6 py-4 items-center`}>
-                <Text className={`${textColor} text-3xl font-bold`}>
-                  {timeDisplay.minutes}
-                </Text>
-                <Text className={`${textMuted} text-xs mt-1`}>Phút</Text>
-              </View>
-              <View className={`${cardBg} rounded-xl px-6 py-4 items-center`}>
-                <Text className={`${textColor} text-3xl font-bold`}>
-                  {timeDisplay.seconds}
-                </Text>
-                <Text className={`${textMuted} text-xs mt-1`}>Giây</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
         {/* Movie and Order Details */}
         <View className={`mx-4 mt-4 mb-4 ${cardBg} rounded-xl p-4`}>
           <View className="flex-row">
