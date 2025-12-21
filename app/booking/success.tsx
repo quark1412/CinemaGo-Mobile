@@ -73,6 +73,13 @@ export default function BookingSuccessScreen() {
           }
         }
 
+        if (!amount) {
+          const storedAmount = await AsyncStorage.getItem("paymentAmount");
+          if (storedAmount) {
+            setAmount(Number(storedAmount));
+          }
+        }
+
         try {
           await paymentService.checkMoMoStatus(usedPaymentId);
           setStatus("pending");
@@ -89,7 +96,11 @@ export default function BookingSuccessScreen() {
               setBookingId(payment.bookingId);
             }
 
-            await AsyncStorage.multiRemove(["paymentId", "bookingId"]);
+            await AsyncStorage.multiRemove([
+              "paymentId",
+              "bookingId",
+              "paymentAmount",
+            ]);
           } else {
             setStatus("failed");
             setMessage("Thanh toán không thành công hoặc đã bị hủy.");

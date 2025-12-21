@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  AppState,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -54,6 +55,8 @@ export default function CheckoutScreen() {
   >({});
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>("COD");
+  const appStateRef = useRef(AppState.currentState);
+  const waitingForMoMoReturnRef = useRef(false);
 
   const selectedSeats = seats ? JSON.parse(seats) : [];
   const seatDetailsData = seatDetails ? JSON.parse(seatDetails) : [];
@@ -68,6 +71,32 @@ export default function CheckoutScreen() {
       loadFoodDrinkDetails();
     }
   }, [foodDrinkData]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active" &&
+        waitingForMoMoReturnRef.current
+      ) {
+        waitingForMoMoReturnRef.current = false;
+
+        setTimeout(() => {
+          router.push({
+            pathname: "/booking/success",
+            params: {
+              method: "MOMO",
+            },
+          } as any);
+        }, 500);
+      }
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [router]);
 
   const loadCheckoutData = async () => {
     try {
@@ -212,15 +241,18 @@ export default function CheckoutScreen() {
               await AsyncStorage.setItem("paymentId", momoResponse.paymentId);
             }
             await AsyncStorage.setItem("bookingId", booking.id);
+            await AsyncStorage.setItem("paymentAmount", totalAmount.toString());
           } catch (storageError) {
             console.warn("Failed to persist payment identifiers", storageError);
           }
 
           const supported = await Linking.canOpenURL(paymentUrl);
           if (supported) {
+            waitingForMoMoReturnRef.current = true;
             await Linking.openURL(paymentUrl);
           } else {
             showToast("Không thể mở trang thanh toán", "error");
+            waitingForMoMoReturnRef.current = false;
           }
           return;
         }

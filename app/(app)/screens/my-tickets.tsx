@@ -200,42 +200,6 @@ export default function MyTickets() {
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderLoadingFooter}
       />
-
-      {/* Tickets Summary */}
-      {loading ? (
-        <View className="bg-card-background border-t border-border p-4">
-          <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
-        </View>
-      ) : (
-        bookings.length > 0 && (
-          <View className="bg-card-background border-t border-border p-4">
-            <View className="flex-row justify-between items-center">
-              <Text className="text-text-muted text-sm font-[medium]">
-                Tổng số vé
-              </Text>
-              <Text className="text-foreground text-lg font-[bold]">
-                {bookings.length}
-              </Text>
-            </View>
-            <View className="flex-row justify-between items-center mt-2">
-              <Text className="text-text-muted text-sm font-[medium]">
-                Tổng tiền
-              </Text>
-              <Text className="text-primary text-lg font-[bold]">
-                {new Intl.NumberFormat("vi-VN", {
-                  style: "currency",
-                  currency: "VND",
-                }).format(
-                  bookings.reduce(
-                    (total, booking) => total + booking.totalPrice,
-                    0
-                  )
-                )}
-              </Text>
-            </View>
-          </View>
-        )
-      )}
     </SafeAreaView>
   );
 }

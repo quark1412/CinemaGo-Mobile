@@ -1556,28 +1556,30 @@ export default function ShowtimeSelectionScreen() {
                 return (
                   <View
                     key={foodDrink.id}
-                    className={`mr-4 ${cardBg} rounded-xl p-3 border ${borderColor}`}
+                    className={`mr-4 ${cardBg} rounded-xl justify-between p-3 border ${borderColor}`}
                     style={{ width: 140 }}
                   >
-                    {foodDrink.image && (
-                      <Image
-                        source={{ uri: foodDrink.image }}
-                        className="w-full h-24 rounded-lg mb-2"
-                        resizeMode="cover"
-                      />
-                    )}
-                    <Text
-                      className={`${textColor} font-semibold text-sm mb-1`}
-                      numberOfLines={2}
-                    >
-                      {foodDrink.name}
-                    </Text>
-                    <Text className={`${textMuted} text-xs mb-2`}>
-                      {new Intl.NumberFormat("vi-VN", {
-                        style: "currency",
-                        currency: "VND",
-                      }).format(foodDrink.price)}
-                    </Text>
+                    <View>
+                      {foodDrink.image && (
+                        <Image
+                          source={{ uri: foodDrink.image }}
+                          className="w-full h-24 rounded-lg mb-2"
+                          resizeMode="cover"
+                        />
+                      )}
+                      <Text
+                        className={`${textColor} font-semibold text-sm mb-1`}
+                        numberOfLines={2}
+                      >
+                        {foodDrink.name}
+                      </Text>
+                      <Text className={`${textMuted} text-xs mb-2`}>
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(foodDrink.price)}
+                      </Text>
+                    </View>
                     <View className="flex-row items-center justify-between">
                       <TouchableOpacity
                         className={`w-8 h-8 rounded-lg items-center justify-center ${
