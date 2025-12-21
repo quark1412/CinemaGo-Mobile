@@ -44,6 +44,7 @@ export default function Home() {
         try {
           // --- Logic gọi API giữ nguyên ---
           const topRatedPromise = movieService.getTopRatedMovies({ limit: 5 });
+          console.log("hehe: ", topRatedPromise);
 
           const fetchAllNowShowing = async () => {
             const allResults: Movie[] = [];
@@ -58,6 +59,8 @@ export default function Home() {
                 status: "NOW_SHOWING",
               });
               const data = (res.data ?? []) as Movie[];
+              console.log("data nè: ", data);
+
               const pagination = res.pagination;
               allResults.push(...data);
               if (!pagination || !pagination.hasNextPage) {
@@ -76,17 +79,30 @@ export default function Home() {
 
           if (isCancelled) return;
 
-          const topRatedIds = new Set(topRatedRes.map((m: Movie) => m.id));
-          let remainingMovies = allNowShowingMovies.filter(
-            (m) => !topRatedIds.has(m.id)
-          );
+          let finalFeatured = topRatedRes;
+          let finalNowShowing = [...allNowShowingMovies];
 
-          if (remainingMovies.length === 0) {
-            remainingMovies = topRatedRes;
+          if (!finalFeatured || finalFeatured.length === 0) {
+            console.log("Top Rated rỗng, mượn Now Showing đắp vào");
+
+            finalFeatured = finalNowShowing.slice(0, 5);
+
+            if (finalNowShowing.length > 5) {
+              finalNowShowing = finalNowShowing.slice(5);
+            }
+          } else {
+            const topRatedIds = new Set(finalFeatured.map((m: Movie) => m.id));
+            finalNowShowing = finalNowShowing.filter(
+              (m) => !topRatedIds.has(m.id)
+            );
           }
 
-          setFeaturedMovies(topRatedRes);
-          setNowShowingMovies(remainingMovies);
+          if (finalNowShowing.length === 0 && finalFeatured.length > 0) {
+            finalNowShowing = [...finalFeatured];
+          }
+
+          setFeaturedMovies(finalFeatured);
+          setNowShowingMovies(finalNowShowing);
         } catch (e) {
           console.error("Lỗi tải dữ liệu Home:", e);
         } finally {
