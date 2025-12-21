@@ -5,7 +5,7 @@ import { jwtDecode } from "jwt-decode";
 
 // const baseURL =
 //   process.env.EXPO_PUBLIC_BASE_URL || "http://192.168.16.59:8000/v1";
-const baseURL = "https://monosepalous-fledgeless-dorthey.ngrok-free.dev/v1";
+const baseURL = "http://192.168.1.9:8000/v1";
 
 console.log(process.env.EXPO_PUBLIC_BASE_URL);
 

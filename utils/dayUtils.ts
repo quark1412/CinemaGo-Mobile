@@ -17,13 +17,18 @@ export const generateDateOptions = (): DateOption[] => {
     options.push({
       date,
       dayOfWeek,
-      dayOfMonth:
-        i === 0
-          ? `${dayOfMonth}/${month}`
-          : `${dayOfWeek}, ${dayOfMonth}/${month}`,
+      dayOfMonth: `${dayOfMonth}/${month}`,
       fullDate,
     });
   }
 
   return options;
 };
+
+export function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+}

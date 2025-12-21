@@ -27,6 +27,7 @@ export const showtimeSelectionService = {
 
       return response.data.data;
     } catch (error: any) {
+      console.log(error);
       throw new Error(
         error.response?.data?.message || "Failed to fetch showtimes"
       );
@@ -40,6 +41,7 @@ export const showtimeSelectionService = {
 
       return response.data.data;
     } catch (error: any) {
+      console.log(error);
       throw new Error(
         error.response?.data?.message || "Failed to fetch showtime details"
       );
@@ -53,11 +55,161 @@ export const showtimeSelectionService = {
 
       const room = response.data.data;
 
-      // Parse the seat layout from the room data
-      if (room.seatLayout) {
-        return typeof room.seatLayout === "string"
-          ? JSON.parse(room.seatLayout)
-          : room.seatLayout;
+      if (room?.seatLayout) {
+        const rawLayout: Array<{
+          row: string;
+          col: number;
+          type: string;
+        }> =
+          typeof room.seatLayout === "string"
+            ? JSON.parse(room.seatLayout)
+            : room.seatLayout;
+
+        if (!Array.isArray(rawLayout) || rawLayout.length === 0) {
+          return { rows: 0, cols: 0, seats: [] };
+        }
+
+        // Determine grid size
+        let maxRow = 0;
+        let maxCol = 0;
+        rawLayout.forEach((seat) => {
+          const rowIndex = seat.row.charCodeAt(0) - 65; // 'A' -> 0
+          const colIndex = seat.col - 1; // 1-based to 0-based
+          if (rowIndex > maxRow) maxRow = rowIndex;
+          if (colIndex > maxCol) maxCol = colIndex;
+        });
+
+        const rows = maxRow + 1;
+        const cols = maxCol + 1;
+
+        // Create empty grid
+        const seats: Seat[][] = Array.from({ length: rows }, (_, rowIndex) =>
+          Array.from({ length: cols }, (_, colIndex) => {
+            const rowLetter = String.fromCharCode(65 + rowIndex);
+            const seatNumber = `${rowLetter}${colIndex + 1}`;
+            return {
+              row: rowIndex,
+              col: colIndex,
+              seatNumber,
+              type: SeatType.EMPTY,
+              status: SeatStatus.AVAILABLE,
+              price: 0,
+            } as Seat;
+          })
+        );
+
+        // Fill in defined seats from seatLayout
+        rawLayout.forEach((seatDef) => {
+          const rowIndex = seatDef.row.charCodeAt(0) - 65;
+          const colIndex = seatDef.col - 1;
+
+          if (
+            rowIndex < 0 ||
+            colIndex < 0 ||
+            rowIndex >= rows ||
+            colIndex >= cols
+          ) {
+            return;
+          }
+
+          const rowLetter = String.fromCharCode(65 + rowIndex);
+          const seatNumber = `${rowLetter}${seatDef.col}`;
+
+          let type: SeatType;
+          switch (seatDef.type) {
+            case "VIP":
+              type = SeatType.VIP;
+              break;
+            case "COUPLE":
+              type = SeatType.COUPLE;
+              break;
+            case "BLOCKED":
+              type = SeatType.BLOCKED;
+              break;
+            case "EMPTY":
+              type = SeatType.EMPTY;
+              break;
+            default:
+              type = SeatType.NORMAL;
+          }
+
+          seats[rowIndex][colIndex] = {
+            row: rowIndex,
+            col: colIndex,
+            seatNumber,
+            type,
+            status:
+              type === SeatType.BLOCKED
+                ? SeatStatus.BOOKED
+                : SeatStatus.AVAILABLE,
+            price: 0,
+          };
+        });
+
+        // Merge adjacent couple seats
+        for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+          for (let colIndex = 0; colIndex < cols - 1; colIndex++) {
+            const currentSeat = seats[rowIndex][colIndex];
+            const nextSeat = seats[rowIndex][colIndex + 1];
+
+            if (
+              currentSeat.type === SeatType.COUPLE &&
+              nextSeat.type === SeatType.COUPLE &&
+              !currentSeat.isCoupleSeat &&
+              !nextSeat.isCoupleSeat
+            ) {
+              const rowLetter = String.fromCharCode(65 + rowIndex);
+              const coupleSeatNumber = `${rowLetter}${colIndex + 1}-${
+                colIndex + 2
+              }`;
+
+              seats[rowIndex][colIndex] = {
+                ...currentSeat,
+                seatNumber: coupleSeatNumber,
+                isCoupleSeat: true,
+                coupleWith: colIndex + 1,
+              };
+
+              seats[rowIndex][colIndex + 1] = {
+                ...nextSeat,
+                seatNumber: coupleSeatNumber,
+                isCoupleSeat: true,
+                coupleWith: colIndex,
+              };
+            }
+          }
+        }
+
+        // Enrich seats with database IDs and extraPrice
+        if (Array.isArray(room.seats)) {
+          room.seats.forEach((seatRecord: any) => {
+            if (!seatRecord?.seatNumber || !seatRecord?.id) return;
+            const rowLetter = seatRecord.seatNumber[0];
+            const colNum = parseInt(seatRecord.seatNumber.slice(1), 10);
+            if (!rowLetter || !colNum || Number.isNaN(colNum)) return;
+
+            const rowIndex = rowLetter.charCodeAt(0) - 65;
+            const colIndex = colNum - 1;
+
+            if (
+              rowIndex < 0 ||
+              colIndex < 0 ||
+              rowIndex >= rows ||
+              colIndex >= cols
+            ) {
+              return;
+            }
+
+            const existing = seats[rowIndex][colIndex];
+            seats[rowIndex][colIndex] = {
+              ...existing,
+              id: seatRecord.id,
+              extraPrice: seatRecord.extraPrice || 0,
+            };
+          });
+        }
+
+        return { rows, cols, seats };
       }
 
       // Return empty layout if none exists
@@ -115,6 +267,18 @@ export const showtimeSelectionService = {
     } catch (error: any) {
       throw new Error(
         error.response?.data?.message || "Failed to fetch cinema details"
+      );
+    }
+  },
+
+  // Get room by ID (similar to POS implementation)
+  getRoomById: async (roomId: string) => {
+    try {
+      const response = await axiosConfig.get(`/rooms/public/${roomId}`);
+      return response.data.data;
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.message || "Failed to fetch room details"
       );
     }
   },

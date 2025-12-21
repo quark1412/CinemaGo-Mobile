@@ -13,6 +13,7 @@ export interface Payment {
 
 export interface PaymentResponse {
   URL: string;
+  paymentId?: string;
 }
 
 export const paymentService = {
@@ -22,16 +23,18 @@ export const paymentService = {
     bookingId: string
   ): Promise<PaymentResponse> => {
     try {
-      const response = await axiosConfig.post(`/payments/momo/checkout`, {
-        amount,
-        bookingId,
-      });
+      const response = await axiosConfig.post(
+        `/payments/momo/checkout`,
+        {
+          amount,
+          bookingId,
+        },
+        { requiresAuth: true } as any
+      );
 
       return response.data;
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to checkout with MoMo"
-      );
+      throw error;
     }
   },
 
@@ -82,9 +85,7 @@ export const paymentService = {
 
       return response.data.data;
     } catch (error: any) {
-      throw new Error(
-        error.response?.data?.message || "Failed to check payment status"
-      );
+      throw error;
     }
   },
 

@@ -73,6 +73,8 @@ export interface Seat {
   type: SeatType;
   status: SeatStatus;
   price: number;
+  id?: string;
+  extraPrice?: number;
   isCoupleSeat?: boolean;
   coupleWith?: number;
 }
