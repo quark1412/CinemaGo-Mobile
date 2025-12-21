@@ -1,8 +1,9 @@
-// app/screens/Cinemas.tsx
 import { useToast } from "@/contexts/toastContext";
 import { cinemaService } from "@/services/cinema";
 import type { Cinema } from "@/types/cinema";
+import { calculateDistance } from "@/utils/locationUtils";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { Stack, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 
@@ -21,8 +22,11 @@ import {
 const DEFAULT_CINEMA_LOGO =
   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop";
 
+const NEAR_ME = "Gần tôi";
+
 const FALLBACK_CITIES = [
-  "TP.HCM",
+  NEAR_ME,
+  "TP.Hồ Chí Minh",
   "Hà Nội",
   "Đà Nẵng",
   "Cần Thơ",
@@ -33,14 +37,36 @@ const FALLBACK_CITIES = [
 
 export default function Cinemas() {
   const [query, setQuery] = useState("");
-  const [city, setCity] = useState("TP.HCM");
+  const [city, setCity] = useState(NEAR_ME);
   const [data, setData] = useState<Cinema[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const { isDark } = useTheme();
   const router = useRouter();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setCity("TP.Hồ Chí Minh");
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({});
+        setUserLocation(location.coords);
+      } catch (error) {
+        console.error("Error fetching location:", error);
+        setCity("TP.Hồ Chí Minh");
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -81,6 +107,7 @@ export default function Cinemas() {
           setData(list);
 
           if (
+            city !== NEAR_ME &&
             allCinemas.length > 0 &&
             !allCinemas.some((c) => c.city === city)
           ) {
@@ -105,26 +132,52 @@ export default function Cinemas() {
     return () => {
       isCancelled = true;
     };
-  }, [city, showToast]);
+  }, [showToast]);
 
   const cities = useMemo(() => {
     const unique = Array.from(new Set(data.map((d) => d.city)));
-    return unique.length > 0 ? unique : FALLBACK_CITIES;
+    return [NEAR_ME, ...(unique.length > 0 ? unique : FALLBACK_CITIES.filter(c => c !== NEAR_ME))];
   }, [data]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    return data.filter((c) => {
-      const normalize = (s: string) => s.trim().toLowerCase();
+    const normalize = (s: string) => s.trim().toLowerCase();
+
+    // 1. Filter by Query first 
+    let filtered = data.filter((c) => {
       return (
-        normalize(c.city) === normalize(city) &&
-        (q.length === 0 ||
-          c.name.toLowerCase().includes(q) ||
-          c.address.toLowerCase().includes(q))
+        q.length === 0 ||
+        c.name.toLowerCase().includes(q) ||
+        c.address.toLowerCase().includes(q)
       );
     });
-  }, [data, city, query]);
+
+    // 2. Filter by City or "Near Me" logic
+    if (city === NEAR_ME) {
+      if (userLocation) {
+        const withDistance = filtered.map(c => {
+
+          const distance = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            Number(c.latitude),
+            Number(c.longitude)
+          );
+          return { ...c, distance };
+        });
+
+        withDistance.sort((a, b) => a.distance - b.distance);
+
+        return withDistance.slice(0, 2);
+      } else {
+
+        return filtered;
+      }
+    } else {
+      return filtered.filter(c => normalize(c.city) === normalize(city));
+    }
+  }, [data, city, query, userLocation]);
 
   const iconColor = isDark ? "#fff" : "#0f172a";
   const textColor = isDark ? "text-white" : "text-slate-900";
@@ -199,7 +252,7 @@ export default function Cinemas() {
 
         <FlatList
           data={results}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={{ paddingBottom: 24 }}
           ItemSeparatorComponent={() => <View className="h-3" />}
           renderItem={({ item }) => (
@@ -222,20 +275,26 @@ export default function Cinemas() {
                   resizeMode="contain"
                 />
                 <View className="flex-1">
-                  <Text
-                    className={`text-[15px] font-[extraBold] ${textColor} `}
-                  >
-                    {item.name}
-                  </Text>
-                  <Text className="text-sm text-gray-500 mt-0.5">
+                  <View className="flex-row justify-between items-center">
+                    <Text
+                      className={`text-[15px] font-[extraBold] ${textColor} flex-1`}
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </Text>
+                    {/* Show distance if available */}
+                    {(item as any).distance !== undefined && (
+                      <Text className="text-xs text-pink-500 font-bold ml-2">
+                        {(item as any).distance} km
+                      </Text>
+                    )}
+                  </View>
+
+                  <Text className="text-sm text-gray-500 mt-0.5" numberOfLines={2}>
                     {item.address ? `${item.address}  ` : ""}
                   </Text>
                 </View>
               </View>
-
-              {/* <Text numberOfLines={2} className="text-[13px] text-gray-700">
-                {item.address}
-              </Text> */}
             </Pressable>
           )}
           ListEmptyComponent={
@@ -272,9 +331,8 @@ export default function Cinemas() {
                       setCity(c);
                       setShowCityPicker(false);
                     }}
-                    className={`p-3 rounded-lg mb-2 ${
-                      c === city ? "bg-pink-100" : "bg-gray-100"
-                    }`}
+                    className={`p-3 rounded-lg mb-2 ${c === city ? "bg-pink-100" : "bg-gray-100"
+                      }`}
                   >
                     <Text className="text-center text-base">{c}</Text>
                   </Pressable>
