@@ -93,7 +93,7 @@ export default function SignIn() {
       setLoading(true);
       await login(email, pwd);
       showToast("Đăng nhập thành công", "success");
-      router.replace("/(app)/(tabs)/account");
+      router.replace("/(app)/(tabs)/home");
     } catch (err: any) {
       console.log(err.message);
       showToast("Đăng nhập không thành công", "error");
@@ -118,7 +118,7 @@ export default function SignIn() {
 
       await refreshUser();
 
-      router.replace("/(app)/(tabs)/account");
+      router.replace("/(app)/(tabs)/home");
     } catch (e) {
       await disableBiometricLogin();
       await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);

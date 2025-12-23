@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useTheme } from "@/contexts/themeContext";
 import { paymentService } from "@/services/payment";
+import { bookingService } from "@/services/booking";
 import { useToast } from "@/contexts/toastContext";
 
 type Status = "pending" | "success" | "failed";
@@ -16,7 +17,6 @@ export default function BookingSuccessScreen() {
   const { isDark } = useTheme();
   const { showToast } = useToast();
   const params = useLocalSearchParams<{
-    paymentId?: string;
     bookingId?: string;
     amount?: string;
     method?: string;
@@ -26,7 +26,6 @@ export default function BookingSuccessScreen() {
   const [message, setMessage] = useState<string>(
     "Đang kiểm tra trạng thái thanh toán..."
   );
-  const [paymentId, setPaymentId] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(
     params.bookingId ?? null
   );
@@ -52,26 +51,17 @@ export default function BookingSuccessScreen() {
       }
 
       try {
-        const queryPaymentId =
-          typeof params.paymentId === "string" ? params.paymentId : null;
-        const storedPaymentId = await AsyncStorage.getItem("paymentId");
+        const resolvedBookingId =
+          (typeof params.bookingId === "string" && params.bookingId) ||
+          (await AsyncStorage.getItem("bookingId"));
 
-        const usedPaymentId = queryPaymentId || storedPaymentId;
-
-        if (!usedPaymentId) {
+        if (!resolvedBookingId) {
           setStatus("failed");
           setMessage("Không tìm thấy thông tin thanh toán.");
           return;
         }
 
-        setPaymentId(usedPaymentId);
-
-        if (!bookingId) {
-          const storedBookingId = await AsyncStorage.getItem("bookingId");
-          if (storedBookingId) {
-            setBookingId(storedBookingId);
-          }
-        }
+        setBookingId(resolvedBookingId);
 
         if (!amount) {
           const storedAmount = await AsyncStorage.getItem("paymentAmount");
@@ -81,30 +71,34 @@ export default function BookingSuccessScreen() {
         }
 
         try {
-          await paymentService.checkMoMoStatus(usedPaymentId);
-          setStatus("pending");
-          setMessage("Thanh toán MoMo đang được xử lý, vui lòng chờ...");
-        } catch (error: any) {
-          if (error?.response?.status === 400) {
-            const payment = await paymentService.getPaymentById(usedPaymentId);
+          const booking =
+            await bookingService.getBookingById(resolvedBookingId);
+          if ((booking as any)?.status === "Đã thanh toán") {
             setStatus("success");
-            setMessage(
-              "Thanh toán MoMo thành công. Đặt vé của bạn đã được xác nhận."
-            );
-            setAmount(payment.amount ?? null);
-            if (payment.bookingId) {
-              setBookingId(payment.bookingId);
-            }
-
-            await AsyncStorage.multiRemove([
-              "paymentId",
-              "bookingId",
-              "paymentAmount",
-            ]);
-          } else {
-            setStatus("failed");
-            setMessage("Thanh toán không thành công hoặc đã bị hủy.");
+            setMessage("Thanh toán và đặt vé thành công!");
+            await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
+            return;
           }
+        } catch (err) {
+          console.warn("Cannot fetch booking before MoMo check", err);
+        }
+
+        try {
+          await paymentService.checkMoMoStatus(resolvedBookingId);
+
+          const updatedBooking =
+            await bookingService.getBookingById(resolvedBookingId);
+          setAmount(updatedBooking.totalPrice ?? null);
+
+          setStatus("success");
+          setMessage(
+            "Thanh toán MoMo thành công. Đặt vé của bạn đã được xác nhận."
+          );
+
+          await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
+        } catch (error: any) {
+          setStatus("failed");
+          setMessage("Thanh toán không thành công hoặc đã bị hủy.");
         }
       } catch (error: any) {
         console.error("Error while checking payment status:", error);
@@ -118,7 +112,7 @@ export default function BookingSuccessScreen() {
     };
 
     checkPaymentStatus();
-  }, [params.method, params.paymentId]);
+  }, [params.method, params.bookingId, amount]);
 
   const handleGoHome = () => {
     router.push("/(app)/(tabs)/home");
@@ -159,25 +153,15 @@ export default function BookingSuccessScreen() {
 
         <Text className={`text-center mb-4 ${textMuted}`}>{message}</Text>
 
-        {(paymentId || bookingId || amount != null) && (
+        {(bookingId || amount != null) && (
           <View className="mt-2 mb-4 rounded-xl bg-slate-800/5 dark:bg-slate-800/40 px-4 py-3">
-            {paymentId && (
-              <View className="flex-row justify-between mb-1">
-                <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Mã thanh toán
-                </Text>
-                <Text className="text-xs font-mono text-slate-700 dark:text-slate-200">
-                  {paymentId}
-                </Text>
-              </View>
-            )}
             {bookingId && (
               <View className="flex-row justify-between mb-1">
                 <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   Mã đặt vé
                 </Text>
                 <Text className="text-xs font-mono text-slate-700 dark:text-slate-200">
-                  {bookingId}
+                  {bookingId.slice(0, 8)}...{bookingId.slice(-4)}
                 </Text>
               </View>
             )}
