@@ -126,7 +126,7 @@ export const Ticket = ({ booking }: TicketProps) => {
           if (seatData) {
             const rowMatch = seatData.seatNumber?.match(/^([A-Z])/i);
             const row = rowMatch ? rowMatch[1].toUpperCase() : "A";
-            const isCoupleSeat = seatData.seatNumber?.includes("-") || false;
+            const isCoupleSeat = seatData.seatType === "COUPLE" || false;
 
             seatsData.push({
               id: bookingSeat.seatId,
@@ -205,6 +205,7 @@ export const Ticket = ({ booking }: TicketProps) => {
 
   // Group seats by type
   const groupSeatsByType = () => {
+    console.log("seatsData", seatsData);
     if (!seatsData || seatsData.length === 0) return {};
 
     const seatsByType: Record<string, SeatData[]> = {};
@@ -212,7 +213,7 @@ export const Ticket = ({ booking }: TicketProps) => {
 
     seatsData.forEach((seat) => {
       // Check couple seat
-      if (seat.seatNumber.includes("-") || seat.isCoupleSeat) {
+      if (seat.type === "COUPLE" || seat.isCoupleSeat) {
         const coupleKey = seat.seatNumber;
         if (!coupleSeatNumbers.has(coupleKey)) {
           coupleSeatNumbers.add(coupleKey);
@@ -341,20 +342,14 @@ export const Ticket = ({ booking }: TicketProps) => {
             <View className="space-y-1">
               {/* Seats grouped by type */}
               {Object.entries(seatsByType).map(([type, seats]) => {
-                let seatCount = seats.length;
-                let pricePerSeat = showtimeData?.showtimePrice || 0;
+                const basePrice = showtimeData?.showtimePrice || 0;
 
-                // Add extra price based on seat type
-                if (type === "VIP") {
-                  pricePerSeat += showtimeData?.roomExtraPrices?.VIP || 0;
-                } else if (type === "COUPLE") {
-                  pricePerSeat += showtimeData?.roomExtraPrices?.COUPLE || 0;
-                  seatCount = seats.length * 2;
-                } else {
-                  pricePerSeat += showtimeData?.roomExtraPrices?.NORMAL || 0;
-                }
+                const seatCount = seats.length;
 
-                const totalPrice = seatCount * pricePerSeat;
+                const totalPrice = seats.reduce((sum, seat: any) => {
+                  const extra = seat?.extraPrice || 0;
+                  return sum + (basePrice + extra);
+                }, 0);
 
                 return (
                   <View key={type} className="flex-row justify-between">

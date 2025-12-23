@@ -247,10 +247,12 @@ export default function ShowtimeSelectionScreen() {
       const movie = await showtimeSelectionService.getMovieDetails(movieId);
       setMovieDetails(movie);
 
-      // Load showtimes for the next 7 days
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 7);
+      endDate.setHours(23, 59, 59, 999);
 
       const showtimesData = await showtimeSelectionService.getShowtimesByMovie(
         movieId,
@@ -1258,6 +1260,7 @@ export default function ShowtimeSelectionScreen() {
                   const isSelected = selectedShowtime?.id === showtime.id;
                   const startTime = new Date(showtime.startTime);
                   const endTime = new Date(showtime.endTime);
+                  const isPastShowtime = startTime.getTime() < Date.now();
 
                   return (
                     <TouchableOpacity
@@ -1266,8 +1269,11 @@ export default function ShowtimeSelectionScreen() {
                         isSelected
                           ? "border-red-600 bg-red-50 dark:bg-red-900/20"
                           : `${borderColor} ${cardBg}`
-                      }`}
-                      onPress={() => handleShowtimeSelect(showtime)}
+                      } ${isPastShowtime ? "opacity-50" : ""}`}
+                      onPress={() =>
+                        !isPastShowtime && handleShowtimeSelect(showtime)
+                      }
+                      disabled={isPastShowtime}
                     >
                       <Text
                         className={`text-center font-bold ${

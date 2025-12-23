@@ -232,7 +232,7 @@ export default function MyTickets() {
       {/* Header */}
       <View className="flex-row p-4 border-b border-border relative">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.navigate("/(app)/(tabs)/account")}
           className="p-2 rounded-lg"
         >
           <Ionicons

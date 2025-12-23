@@ -74,23 +74,36 @@ export default function CheckoutScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState) => {
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      appStateRef.current = nextAppState;
+
       if (
-        appStateRef.current.match(/inactive|background/) &&
+        wasBackground &&
         nextAppState === "active" &&
         waitingForMoMoReturnRef.current
       ) {
         waitingForMoMoReturnRef.current = false;
 
-        setTimeout(() => {
-          router.push({
-            pathname: "/booking/success",
-            params: {
-              method: "MOMO",
-            },
-          } as any);
-        }, 500);
+        (async () => {
+          try {
+            const [storedBookingId, storedAmount] = await Promise.all([
+              AsyncStorage.getItem("bookingId"),
+              AsyncStorage.getItem("paymentAmount"),
+            ]);
+
+            router.push({
+              pathname: "/booking/success",
+              params: {
+                method: "MOMO",
+                bookingId: storedBookingId ?? "",
+                amount: storedAmount ?? "",
+              },
+            } as any);
+          } catch (error) {
+            console.warn("Failed to restore MoMo return state", error);
+          }
+        })();
       }
-      appStateRef.current = nextAppState;
     });
 
     return () => {
@@ -237,11 +250,10 @@ export default function CheckoutScreen() {
 
           // Persist identifiers for the booking completed screen
           try {
-            if (momoResponse.paymentId) {
-              await AsyncStorage.setItem("paymentId", momoResponse.paymentId);
-            }
-            await AsyncStorage.setItem("bookingId", booking.id);
-            await AsyncStorage.setItem("paymentAmount", totalAmount.toString());
+            await AsyncStorage.multiSet([
+              ["bookingId", booking.id],
+              ["paymentAmount", totalAmount.toString()],
+            ]);
           } catch (storageError) {
             console.warn("Failed to persist payment identifiers", storageError);
           }

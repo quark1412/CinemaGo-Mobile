@@ -8,7 +8,6 @@ import {
 } from "@/types/showtime";
 
 export const showtimeSelectionService = {
-  // Get showtimes by movie ID and optional date filter
   getShowtimesByMovie: async (
     movieId: string,
     startDate?: string,
@@ -18,6 +17,7 @@ export const showtimeSelectionService = {
       const params: any = {
         movieId,
         isActive: true,
+        limit: undefined,
       };
 
       if (startDate) params.startTime = startDate;
