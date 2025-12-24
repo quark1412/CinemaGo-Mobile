@@ -21,7 +21,7 @@ import { useToast } from "@/contexts/toastContext";
 import { useTheme } from "@/contexts/themeContext";
 import * as DeepLinking from "expo-linking";
 
-type PaymentMethod = "COD" | "MOMO" | "VNPAY" | "ZALOPAY";
+type PaymentMethod = "COD" | "MOMO" | "ZALOPAY";
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -266,39 +266,6 @@ export default function CheckoutScreen() {
           } else {
             showToast("Không thể mở trang thanh toán", "error");
             waitingForMoMoReturnRef.current = false;
-          }
-          return;
-        }
-        case "VNPAY": {
-          const redirectUrl = DeepLinking.createURL("booking/success");
-          const vnpayResponse = await paymentService.checkoutWithVnPay(
-            totalAmount,
-            booking.id,
-            redirectUrl
-          );
-
-          const paymentUrl = vnpayResponse.URL;
-
-          if (!paymentUrl) {
-            showToast("Không thể tạo liên kết thanh toán VnPay", "error");
-            return;
-          }
-
-          // Persist identifiers for the booking completed screen
-          try {
-            await AsyncStorage.multiSet([
-              ["bookingId", booking.id],
-              ["paymentAmount", totalAmount.toString()],
-            ]);
-          } catch (storageError) {
-            console.warn("Failed to persist payment identifiers", storageError);
-          }
-
-          const supported = await Linking.canOpenURL(paymentUrl);
-          if (supported) {
-            await Linking.openURL(paymentUrl);
-          } else {
-            showToast("Không thể mở trang thanh toán VnPay", "error");
           }
           return;
         }
@@ -709,43 +676,6 @@ export default function CheckoutScreen() {
               }`}
             >
               {selectedPaymentMethod === "MOMO" && (
-                <View className="w-full h-full rounded-full bg-red-600" />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* VnPay */}
-          <TouchableOpacity
-            className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
-              selectedPaymentMethod === "VNPAY"
-                ? `${cardBg} border-red-600`
-                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
-            }`}
-            onPress={() => setSelectedPaymentMethod("VNPAY")}
-          >
-            <View className="flex-row items-center gap-3">
-              <Image
-                source={require("@/assets/images/vnpay_icon.png")}
-                className="w-10 h-10 rounded-lg"
-                resizeMode="cover"
-              />
-              <View>
-                <Text className={`${textColor} font-semibold`}>VNPAY</Text>
-                <Text className={`${textMuted} text-xs mt-1`}>
-                  Thanh toán qua cổng VNPAY
-                </Text>
-              </View>
-            </View>
-            <View
-              className={`w-5 h-5 rounded-full border-2 ${
-                selectedPaymentMethod === "VNPAY"
-                  ? "border-red-600 bg-red-600"
-                  : isDark
-                    ? "border-slate-600"
-                    : "border-slate-400"
-              }`}
-            >
-              {selectedPaymentMethod === "VNPAY" && (
                 <View className="w-full h-full rounded-full bg-red-600" />
               )}
             </View>
