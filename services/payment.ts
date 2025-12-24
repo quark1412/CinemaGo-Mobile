@@ -20,7 +20,8 @@ export const paymentService = {
   // Checkout with MoMo
   checkoutWithMoMo: async (
     amount: number,
-    bookingId: string
+    bookingId: string,
+    urlCheckoutCompleted?: string
   ): Promise<PaymentResponse> => {
     try {
       const response = await axiosConfig.post(
@@ -28,6 +29,7 @@ export const paymentService = {
         {
           amount,
           bookingId,
+          urlCheckoutCompleted,
         },
         { requiresAuth: true } as any
       );

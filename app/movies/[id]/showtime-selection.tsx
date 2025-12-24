@@ -70,7 +70,6 @@ export default function ShowtimeSelectionScreen() {
   const [bookedSeatIds, setBookedSeatIds] = useState<string[]>([]);
   const [heldSeatIds, setHeldSeatIds] = useState<string[]>([]);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
-  const [heldSeatNumbers, setHeldSeatNumbers] = useState<string[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [loadingSeatMap, setLoadingSeatMap] = useState(false);
   const [foodDrinks, setFoodDrinks] = useState<FoodDrink[]>([]);
@@ -87,22 +86,31 @@ export default function ShowtimeSelectionScreen() {
   const [timerActive, setTimerActive] = useState(false);
   const timerStartTimeRef = useRef<number | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const previousShowtimeIdRef = useRef<string | null>(null);
 
   // Generate date options
   const dateOptions = useMemo<DateOption[]>(() => {
     return generateDateOptions();
   }, []);
 
-  // Filter showtimes by selected date
+  // Filter showtimes by selected date and sort by startTime ascending
   const filteredShowtimes = useMemo(() => {
     if (!selectedDate || !showtimes.length) return [];
 
-    return showtimes.filter((showtime) => {
-      const showtimeDate = new Date(showtime.startTime)
-        .toISOString()
-        .split("T")[0];
-      return showtimeDate === selectedDate.fullDate;
-    });
+    const filtered = showtimes
+      .filter((showtime) => {
+        const showtimeDate = new Date(showtime.startTime)
+          .toISOString()
+          .split("T")[0];
+        return showtimeDate === selectedDate.fullDate;
+      })
+      .sort((a, b) => {
+        return (
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
+      });
+
+    return filtered;
   }, [selectedDate, showtimes]);
 
   // Calculate total price
@@ -125,6 +133,20 @@ export default function ShowtimeSelectionScreen() {
 
     return seatsPrice + foodDrinksPrice;
   }, [selectedSeats, selectedFoodDrinks, selectedShowtime, seatPriceMap]);
+
+  // Compute held seat numbers
+  const heldSeatNumbers = useMemo(() => {
+    const numbers: string[] = [];
+    heldSeatIds.forEach((seatId) => {
+      const seat = Array.from(seatMap.values()).find((s) => s.id === seatId);
+      const isSelectedByCurrent =
+        seat && selectedSeats.some((s) => s.id === seat.id);
+      if (seat && seat.seatNumber && !isSelectedByCurrent) {
+        numbers.push(seat.seatNumber);
+      }
+    });
+    return numbers;
+  }, [heldSeatIds, seatMap, selectedSeats]);
 
   // Calculate remaining time
   const calculateRemainingTime = useCallback((startTime: number) => {
@@ -153,7 +175,7 @@ export default function ShowtimeSelectionScreen() {
           bookingService
             .releaseSeat({
               showtimeId: selectedShowtime.id,
-              seatId: seat.id ?? seat.seatNumber,
+              seatId: seat.id as string,
             })
             .catch(() => {})
         )
@@ -161,7 +183,6 @@ export default function ShowtimeSelectionScreen() {
 
       setSelectedSeats([]);
       setHeldSeatIds([]);
-      setHeldSeatNumbers([]);
       setTimerActive(false);
       timerStartTimeRef.current = null;
 
@@ -173,7 +194,7 @@ export default function ShowtimeSelectionScreen() {
 
   // Start timer when seats are selected
   useEffect(() => {
-    if (selectedSeats.length > 0 && !timerActive) {
+    if (selectedSeats.length > 0 && !timerActive && selectedShowtime) {
       timerStartTimeRef.current = Date.now();
       setTimerActive(true);
     } else if (selectedSeats.length === 0 && timerActive) {
@@ -184,7 +205,17 @@ export default function ShowtimeSelectionScreen() {
         seconds: 0,
       });
     }
-  }, [selectedSeats.length, timerActive]);
+  }, [selectedSeats.length, timerActive, selectedShowtime]);
+
+  // Reset timer when showtime changes
+  useEffect(() => {
+    setTimerActive(false);
+    timerStartTimeRef.current = null;
+    setTimeRemaining({
+      minutes: SEAT_HOLD_TIMEOUT_MINUTES,
+      seconds: 0,
+    });
+  }, [selectedShowtime?.id]);
 
   // AppState listener to handle background/foreground transitions
   useEffect(() => {
@@ -315,7 +346,6 @@ export default function ShowtimeSelectionScreen() {
     setBookedSeatIds([]);
     setHeldSeatIds([]);
     setBookedSeats([]);
-    setHeldSeatNumbers([]);
     setSelectedSeats([]);
   };
 
@@ -509,7 +539,7 @@ export default function ShowtimeSelectionScreen() {
           }
         }
 
-        // Load held seats
+        // Load held seats (keep all held seats, filtering happens in useMemo)
         try {
           const heldSeatsResponse = await bookingService.getHeldSeats(
             showtime.id
@@ -517,38 +547,13 @@ export default function ShowtimeSelectionScreen() {
 
           const heldIds = heldSeatsResponse.data.map((h) => h.seatId);
           setHeldSeatIds(heldIds);
-
-          // Get held seat numbers
-          const heldNumbers: string[] = [];
-          heldIds.forEach((seatId) => {
-            let seat = Array.from(newSeatMap.values()).find(
-              (s) => s.id === seatId
-            );
-
-            if (!seat && seats) {
-              const layoutSeat = seats
-                .flat()
-                .find((s: Seat) => s.id === seatId);
-              if (layoutSeat && layoutSeat.seatNumber) {
-                heldNumbers.push(layoutSeat.seatNumber);
-                return;
-              }
-            }
-
-            if (seat && seat.seatNumber) {
-              heldNumbers.push(seat.seatNumber);
-            }
-          });
-          setHeldSeatNumbers(heldNumbers);
         } catch (err) {
           setHeldSeatIds([]);
-          setHeldSeatNumbers([]);
         }
       }
 
-      // If no seatLayout, still try to load booked/held seats
       if (!roomData.seatLayout || !Array.isArray(roomData.seatLayout)) {
-        // Load booked seats even if no layout
+        // Load booked seats
         try {
           const bookedSeatsResponse = await bookingService.getBookedSeats(
             showtime.id
@@ -575,27 +580,15 @@ export default function ShowtimeSelectionScreen() {
           setBookedSeats([]);
         }
 
-        // Load held seats even if no layout
+        // Load held seats
         try {
           const heldSeatsResponse = await bookingService.getHeldSeats(
             showtime.id
           );
           const heldIds = heldSeatsResponse.data.map((h) => h.seatId);
           setHeldSeatIds(heldIds);
-
-          const heldNumbers: string[] = [];
-          heldIds.forEach((seatId) => {
-            const seat = Array.from(newSeatMap.values()).find(
-              (s) => s.id === seatId
-            );
-            if (seat && seat.seatNumber) {
-              heldNumbers.push(seat.seatNumber);
-            }
-          });
-          setHeldSeatNumbers(heldNumbers);
         } catch (err) {
           setHeldSeatIds([]);
-          setHeldSeatNumbers([]);
         }
       }
     } catch (error: any) {
@@ -617,7 +610,6 @@ export default function ShowtimeSelectionScreen() {
         }
 
         const isBooked = booked.includes(seat.seatNumber);
-        // Calculate price using seatPriceMap if available, otherwise use seat.extraPrice
         const extraPrice =
           seatPriceMap.get(seat.seatNumber) || seat.extraPrice || 0;
         let price = basePrice + extraPrice;
@@ -641,7 +633,7 @@ export default function ShowtimeSelectionScreen() {
       return;
     }
 
-    // Handle couple seats (like POS)
+    // Handle couple seats
     let seatsToProcess: any[] = [];
 
     if (seat.isCoupleSeat && seat.seatNumber.includes("-")) {
@@ -685,26 +677,23 @@ export default function ShowtimeSelectionScreen() {
       selectedSeats.some((s) => s.id === seatData.id)
     );
 
-    try {
-      if (allSelected) {
-        // Deselect and release all seats
-        const seatIdsToRemove = seatsToProcess.map((s) => s.id);
-        setSelectedSeats(
-          selectedSeats.filter((s) => !seatIdsToRemove.includes(s.id))
-        );
-        setHeldSeatIds(
-          heldSeatIds.filter((id) => !seatIdsToRemove.includes(id))
-        );
+    if (allSelected) {
+      // Deselect and release all seats
+      const seatIdsToRemove = seatsToProcess.map((s) => s.id);
+      const newHeldSeatIds = heldSeatIds.filter(
+        (id) => !seatIdsToRemove.includes(id)
+      );
 
-        // Update held seat numbers for display
-        const seatNumbersToRemove = seatsToProcess.map((s) => s.seatNumber);
-        setHeldSeatNumbers((prev) =>
-          prev.filter((num) => !seatNumbersToRemove.includes(num))
-        );
+      setSelectedSeats(
+        selectedSeats.filter((s) => !seatIdsToRemove.includes(s.id))
+      );
+      setHeldSeatIds(newHeldSeatIds);
 
-        // Release all seats
-        await Promise.all(
-          seatsToProcess.map((seatData) =>
+      // Release only seats that are actually held
+      await Promise.all(
+        seatsToProcess
+          .filter((seatData) => heldSeatIds.includes(seatData.id))
+          .map((seatData) =>
             bookingService
               .releaseSeat({
                 showtimeId: selectedShowtime.id,
@@ -712,68 +701,58 @@ export default function ShowtimeSelectionScreen() {
               })
               .catch(() => {})
           )
+      );
+    } else {
+      // Select and hold all seats
+      try {
+        await Promise.all(
+          seatsToProcess.map((seatData) =>
+            bookingService.holdSeat({
+              showtimeId: selectedShowtime.id,
+              seatId: seatData.id,
+            })
+          )
         );
-      } else {
-        // Select and hold all seats
-        try {
-          await Promise.all(
-            seatsToProcess.map((seatData) =>
-              bookingService.holdSeat({
-                showtimeId: selectedShowtime.id,
-                seatId: seatData.id,
-              })
-            )
-          );
 
-          // Add seats to selected (convert seatData to Seat format)
-          const newSeats: Seat[] = seatsToProcess.map((seatData) => {
-            // Find the seat in the layout
-            const layoutSeat = rawSeatLayout?.seats
-              .flat()
-              .find((s) => s.seatNumber === seatData.seatNumber);
+        // Add seats to selected
+        const newSeats: Seat[] = seatsToProcess.map((seatData) => {
+          // Find the seat in the layout
+          const layoutSeat = rawSeatLayout?.seats
+            .flat()
+            .find((s) => s.seatNumber === seatData.seatNumber);
 
-            // Calculate seat price: basePrice + extraPrice
-            const basePrice = selectedShowtime?.price || 0;
-            const extraPrice =
-              seatData.extraPrice ||
-              seatPriceMap.get(seatData.seatNumber) ||
-              layoutSeat?.extraPrice ||
-              0;
-            const seatPrice = basePrice + extraPrice;
+          // Calculate seat price: basePrice + extraPrice
+          const basePrice = selectedShowtime?.price || 0;
+          const extraPrice =
+            seatData.extraPrice ||
+            seatPriceMap.get(seatData.seatNumber) ||
+            layoutSeat?.extraPrice ||
+            0;
+          const seatPrice = basePrice + extraPrice;
 
-            return {
-              row: layoutSeat?.row ?? 0,
-              col: layoutSeat?.col ?? 0,
-              seatNumber: seatData.seatNumber,
-              type: layoutSeat?.type ?? SeatType.NORMAL,
-              status: SeatStatus.SELECTED,
-              price: seatPrice, // Use calculated price
-              id: seatData.id,
-              extraPrice: extraPrice,
-              isCoupleSeat: layoutSeat?.isCoupleSeat,
-              coupleWith: layoutSeat?.coupleWith,
-            };
-          });
+          return {
+            row: layoutSeat?.row ?? 0,
+            col: layoutSeat?.col ?? 0,
+            seatNumber: seatData.seatNumber,
+            type: layoutSeat?.type ?? SeatType.NORMAL,
+            status: SeatStatus.SELECTED,
+            price: seatPrice,
+            id: seatData.id,
+            extraPrice: extraPrice,
+            isCoupleSeat: layoutSeat?.isCoupleSeat,
+            coupleWith: layoutSeat?.coupleWith,
+          };
+        });
 
-          setSelectedSeats([...selectedSeats, ...newSeats]);
-          setHeldSeatIds([...heldSeatIds, ...seatsToProcess.map((s) => s.id)]);
-
-          // Update held seat numbers for display
-          const newHeldNumbers = seatsToProcess.map((s) => s.seatNumber);
-          setHeldSeatNumbers((prev) => {
-            const updated = [...prev, ...newHeldNumbers];
-            return [...new Set(updated)];
-          });
-        } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showToast("Ghế này vừa được giữ bởi người khác", "error");
-          } else {
-            showToast("Không thể giữ ghế, vui lòng thử lại", "error");
-          }
+        setSelectedSeats([...selectedSeats, ...newSeats]);
+        setHeldSeatIds([...heldSeatIds, ...seatsToProcess.map((s) => s.id)]);
+      } catch (error: any) {
+        if (error?.response?.status === 409) {
+          showToast("Ghế này vừa được giữ bởi người khác", "error");
+          return;
         }
+        showToast("Không thể giữ ghế, vui lòng thử lại", "error");
       }
-    } catch (error: any) {
-      console.error("Seat toggle failed:", error);
     }
   };
 
@@ -781,36 +760,14 @@ export default function ShowtimeSelectionScreen() {
   useEffect(() => {
     if (!rawSeatLayout || !selectedShowtime) return;
 
-    // Update seat statuses with both booked and held seats
+    // Update seat statuses with booked seats
     const updated = updateSeatStatuses(
       rawSeatLayout,
       bookedSeats,
       selectedShowtime.price
     );
 
-    // Also mark held seats in the layout
-    const updatedWithHeld = {
-      ...updated,
-      seats: updated.seats.map((row) =>
-        row.map((seat) => {
-          if (seat.type === SeatType.EMPTY || seat.type === SeatType.BLOCKED) {
-            return seat;
-          }
-
-          // Check if seat is held
-          const isHeld = heldSeatNumbers.includes(seat.seatNumber);
-          const isSelected = selectedSeats.some(
-            (s) => s.seatNumber === seat.seatNumber
-          );
-
-          return {
-            ...seat,
-          };
-        })
-      ),
-    };
-
-    setSeatLayout(updatedWithHeld);
+    setSeatLayout(updated);
   }, [
     rawSeatLayout,
     bookedSeats,
@@ -967,32 +924,38 @@ export default function ShowtimeSelectionScreen() {
   // Join/leave showtime room when selection changes
   useEffect(() => {
     let isActive = true;
+    const currentShowtimeId = selectedShowtime?.id || null;
+
+    if (previousShowtimeIdRef.current === currentShowtimeId) {
+      return;
+    }
 
     (async () => {
       const socket = await getSocket();
       if (!isActive) return;
 
-      if (selectedShowtime) {
-        socket.emit("join-showtime", selectedShowtime.id);
-        console.log("Joined showtime room (mobile):", selectedShowtime.id);
+      if (previousShowtimeIdRef.current) {
+        socket.emit("leave-showtime", previousShowtimeIdRef.current);
+        console.log(
+          "Left showtime room (mobile):",
+          previousShowtimeIdRef.current
+        );
       }
+
+      if (currentShowtimeId) {
+        socket.emit("join-showtime", currentShowtimeId);
+        console.log("Joined showtime room (mobile):", currentShowtimeId);
+      }
+
+      previousShowtimeIdRef.current = currentShowtimeId;
     })();
 
     return () => {
       isActive = false;
-      if (selectedShowtime) {
-        (async () => {
-          try {
-            const socket = await getSocket();
-            socket.emit("leave-showtime", selectedShowtime.id);
-            console.log("Left showtime room (mobile):", selectedShowtime.id);
-          } catch {}
-        })();
-      }
     };
-  }, [selectedShowtime]);
+  }, [selectedShowtime?.id]);
 
-  // Listen for real-time seat updates from server (socket.io) - fetch held and booked seats
+  // Listen for real-time seat updates from server (socket.io)
   useEffect(() => {
     let isSubscribed = true;
 
@@ -1005,55 +968,45 @@ export default function ShowtimeSelectionScreen() {
       if (!selectedShowtime || data.showtimeId !== selectedShowtime.id) return;
 
       try {
-        // Always re-fetch both held and booked seats on any seat-update event
-        const [heldSeatsResponse, bookedSeatsResponse] = await Promise.all([
-          bookingService.getHeldSeats(data.showtimeId),
-          bookingService.getBookedSeats(data.showtimeId),
-        ]);
-
-        // Update held seats
+        // Re-fetch held seats to get the latest state
+        const heldSeatsResponse = await bookingService.getHeldSeats(
+          data.showtimeId
+        );
         const newHeldSeatIds = heldSeatsResponse.data.map((h) => h.seatId);
         setHeldSeatIds(newHeldSeatIds);
 
-        // Update held seat numbers for display
-        const newHeldNumbers: string[] = [];
-        newHeldSeatIds.forEach((seatId) => {
-          const seat = Array.from(seatMap.values()).find(
-            (s) => s.id === seatId
-          );
-          if (seat && seat.seatNumber) {
-            newHeldNumbers.push(seat.seatNumber);
-          }
-        });
-        setHeldSeatNumbers(newHeldNumbers);
-
-        // Update booked seats
-        const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
-          ? bookedSeatsResponse.data
-              .map((booking: any) => booking.seatId)
-              .filter((id: any) => Boolean(id))
-          : [];
-        setBookedSeatIds(bookedIds);
-
-        // Update booked seat numbers for display
-        const bookedNumbers: string[] = [];
-        bookedIds.forEach((seatId) => {
-          const seat = Array.from(seatMap.values()).find(
-            (s) => s.id === seatId
-          );
-          if (seat && seat.seatNumber) {
-            bookedNumbers.push(seat.seatNumber);
-          }
-        });
-        setBookedSeats(bookedNumbers);
-
-        // Handle specific status changes
+        // If a seat was booked, update booked seats and remove from selected/held
         if (data.status === "booked") {
           // Remove from selected seats if it was selected
           setSelectedSeats((prev) =>
             prev.filter((seat) => seat.id !== data.seatId)
           );
-        } else if (data.status === "released") {
+          // Update booked seats list
+          const bookedSeatsResponse = await bookingService.getBookedSeats(
+            data.showtimeId
+          );
+          const bookedIds: string[] = Array.isArray(bookedSeatsResponse.data)
+            ? bookedSeatsResponse.data
+                .map((booking: any) => booking.seatId)
+                .filter((id: any) => Boolean(id))
+            : [];
+          setBookedSeatIds(bookedIds);
+
+          // Update booked seat numbers for display
+          const bookedNumbers: string[] = [];
+          bookedIds.forEach((seatId) => {
+            const seat = Array.from(seatMap.values()).find(
+              (s) => s.id === seatId
+            );
+            if (seat && seat.seatNumber) {
+              bookedNumbers.push(seat.seatNumber);
+            }
+          });
+          setBookedSeats(bookedNumbers);
+        }
+
+        // If a seat was released, check if it's still in our selected seats
+        if (data.status === "released") {
           // Check if the seat is no longer held
           if (!newHeldSeatIds.includes(data.seatId)) {
             // Remove from selected seats only if it's no longer held
@@ -1092,29 +1045,93 @@ export default function ShowtimeSelectionScreen() {
         }
       })();
     };
-  }, [selectedShowtime, seatMap]);
+  }, [selectedShowtime?.id, seatMap]);
 
-  // Release seats when switching showtime
+  // Release seats when switching showtime (only when showtime ID changes)
+  const previousShowtimeIdForCleanup = useRef<string | null>(null);
+  const previousSelectedSeatsRef = useRef<Seat[]>([]);
+  const previousHeldSeatIdsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const currentShowtimeId = selectedShowtime?.id || null;
+
+    // If showtime changed, release seats from previous showtime
+    if (
+      previousShowtimeIdForCleanup.current !== null &&
+      previousShowtimeIdForCleanup.current !== currentShowtimeId &&
+      previousShowtimeIdForCleanup.current
+    ) {
+      // Use refs to get the seats that were selected for the previous showtime
+      const seatsToRelease = previousSelectedSeatsRef.current.filter(
+        (seat) => seat.id && previousHeldSeatIdsRef.current.includes(seat.id)
+      );
+
+      if (seatsToRelease.length > 0) {
+        (async () => {
+          try {
+            await Promise.all(
+              seatsToRelease.map((seat) =>
+                bookingService
+                  .releaseSeat({
+                    showtimeId: previousShowtimeIdForCleanup.current!,
+                    seatId: seat.id as string,
+                  })
+                  .catch(() => {})
+              )
+            );
+          } catch {}
+        })();
+      }
+    }
+
+    // Update refs
+    previousShowtimeIdForCleanup.current = currentShowtimeId;
+    previousSelectedSeatsRef.current = selectedSeats;
+    previousHeldSeatIdsRef.current = heldSeatIds;
+  }, [selectedShowtime?.id, selectedSeats, heldSeatIds]);
+
+  // Cleanup on component unmount
+  const selectedShowtimeRef = useRef(selectedShowtime);
+  const selectedSeatsRef = useRef(selectedSeats);
+  const heldSeatIdsRef = useRef(heldSeatIds);
+
+  useEffect(() => {
+    selectedShowtimeRef.current = selectedShowtime;
+    selectedSeatsRef.current = selectedSeats;
+    heldSeatIdsRef.current = heldSeatIds;
+  });
+
   useEffect(() => {
     return () => {
-      if (!selectedShowtime || selectedSeats.length === 0) return;
+      const showtime = selectedShowtimeRef.current;
+      const seats = selectedSeatsRef.current;
+      const heldIds = heldSeatIdsRef.current;
 
-      (async () => {
-        try {
-          await Promise.all(
-            selectedSeats.map((seat) =>
-              bookingService
-                .releaseSeat({
-                  showtimeId: selectedShowtime.id,
-                  seatId: seat.id ?? seat.seatNumber,
-                })
-                .catch(() => {})
-            )
-          );
-        } catch {}
-      })();
+      if (!showtime || seats.length === 0) return;
+
+      // Release only seats that are actually held
+      const seatsToRelease = seats.filter(
+        (seat) => seat.id && heldIds.includes(seat.id)
+      );
+
+      if (seatsToRelease.length > 0) {
+        (async () => {
+          try {
+            await Promise.all(
+              seatsToRelease.map((seat) =>
+                bookingService
+                  .releaseSeat({
+                    showtimeId: showtime.id,
+                    seatId: seat.id as string,
+                  })
+                  .catch(() => {})
+              )
+            );
+          } catch {}
+        })();
+      }
     };
-  }, [selectedShowtime, selectedSeats]);
+  }, []);
 
   // Theme-aware colors
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
@@ -1140,7 +1157,7 @@ export default function ShowtimeSelectionScreen() {
 
   return (
     <SafeAreaView className={`flex-1 ${bgColor}`} edges={["top"]}>
-      {/* Timer in top right corner - shows when timer is active */}
+      {/* Timer  */}
       {timerActive && (
         <View
           className="absolute top-16 right-4 z-50"
@@ -1259,7 +1276,6 @@ export default function ShowtimeSelectionScreen() {
                 {filteredShowtimes.map((showtime) => {
                   const isSelected = selectedShowtime?.id === showtime.id;
                   const startTime = new Date(showtime.startTime);
-                  const endTime = new Date(showtime.endTime);
                   const isPastShowtime = startTime.getTime() < Date.now();
 
                   return (
@@ -1333,15 +1349,15 @@ export default function ShowtimeSelectionScreen() {
                     <Text className={`${textMuted} text-xs`}>Còn trống</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
-                    <View className="w-4 h-4 bg-blue-900 border-2 border-blue-500 rounded" />
+                    <View className="w-4 h-4 bg-blue-100 border-2 border-blue-500 rounded" />
                     <Text className={`${textMuted} text-xs`}>Đang chọn</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
-                    <View className="w-4 h-4 bg-yellow-700 border-2 border-yellow-500 rounded" />
+                    <View className="w-4 h-4 bg-yellow-100 border-2 border-yellow-500 rounded" />
                     <Text className={`${textMuted} text-xs`}>Đã giữ</Text>
                   </View>
                   <View className="flex-row items-center gap-2">
-                    <View className="w-4 h-4 bg-red-900 border-2 border-red-500 rounded" />
+                    <View className="w-4 h-4 bg-red-100 border-2 border-red-500 rounded" />
                     <Text className={`${textMuted} text-xs`}>Đã đặt</Text>
                   </View>
                 </View>

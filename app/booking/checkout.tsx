@@ -243,7 +243,8 @@ export default function CheckoutScreen() {
         case "MOMO": {
           const momoResponse = await paymentService.checkoutWithMoMo(
             totalAmount,
-            booking.id
+            booking.id,
+            "expo://192.168.1.9:8001/booking/success"
           );
 
           const paymentUrl = momoResponse.URL;

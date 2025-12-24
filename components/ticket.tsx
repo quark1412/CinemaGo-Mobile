@@ -203,33 +203,152 @@ export const Ticket = ({ booking }: TicketProps) => {
     return typeMap[type] || type;
   };
 
-  // Group seats by type
+  // Format seat numbers for display (group couple seats)
+  const formatSeatNumbers = () => {
+    if (!seatsData || seatsData.length === 0) return "N/A";
+
+    const coupleSeats = seatsData.filter(
+      (seat) => seat.type === "COUPLE" || seat.isCoupleSeat
+    );
+    const regularSeats = seatsData.filter(
+      (seat) => seat.type !== "COUPLE" && !seat.isCoupleSeat
+    );
+
+    const processedSeatIds = new Set<string>();
+    const seatNumbers: string[] = [];
+
+    // Process couple seats - group adjacent ones
+    coupleSeats.forEach((seat) => {
+      if (processedSeatIds.has(seat.id)) return;
+
+      const rowMatch = seat.seatNumber.match(/^([A-Z])(\d+)$/);
+      if (!rowMatch) {
+        seatNumbers.push(seat.seatNumber);
+        processedSeatIds.add(seat.id);
+        return;
+      }
+
+      const rowLetter = rowMatch[1];
+      const seatNum = parseInt(rowMatch[2]);
+
+      // Find adjacent couple seat
+      const adjacentSeat = coupleSeats.find((s) => {
+        if (s.id === seat.id || processedSeatIds.has(s.id)) return false;
+        const sRowMatch = s.seatNumber.match(/^([A-Z])(\d+)$/);
+        if (!sRowMatch) return false;
+        return (
+          sRowMatch[1] === rowLetter &&
+          (parseInt(sRowMatch[2]) === seatNum + 1 ||
+            parseInt(sRowMatch[2]) === seatNum - 1)
+        );
+      });
+
+      if (adjacentSeat) {
+        // Group as couple seat number
+        const minNum = Math.min(
+          seatNum,
+          parseInt(adjacentSeat.seatNumber.match(/^([A-Z])(\d+)$/)![2])
+        );
+        const maxNum = Math.max(
+          seatNum,
+          parseInt(adjacentSeat.seatNumber.match(/^([A-Z])(\d+)$/)![2])
+        );
+        seatNumbers.push(`${rowLetter}${minNum}-${maxNum}`);
+        processedSeatIds.add(seat.id);
+        processedSeatIds.add(adjacentSeat.id);
+      } else {
+        seatNumbers.push(seat.seatNumber);
+        processedSeatIds.add(seat.id);
+      }
+    });
+
+    // Add regular seats
+    regularSeats.forEach((seat) => {
+      seatNumbers.push(seat.seatNumber);
+    });
+
+    return seatNumbers.join(", ");
+  };
+
+  // Group seats by type and track couple pairs
   const groupSeatsByType = () => {
     console.log("seatsData", seatsData);
     if (!seatsData || seatsData.length === 0) return {};
 
     const seatsByType: Record<string, SeatData[]> = {};
-    const coupleSeatNumbers = new Set<string>();
+    const processedSeatIds = new Set<string>();
 
-    seatsData.forEach((seat) => {
-      // Check couple seat
-      if (seat.type === "COUPLE" || seat.isCoupleSeat) {
-        const coupleKey = seat.seatNumber;
-        if (!coupleSeatNumbers.has(coupleKey)) {
-          coupleSeatNumbers.add(coupleKey);
-          if (!seatsByType["COUPLE"]) {
-            seatsByType["COUPLE"] = [];
-          }
-          seatsByType["COUPLE"].push(seat);
+    // First, group couple seats together
+    const coupleSeats = seatsData.filter(
+      (seat) => seat.type === "COUPLE" || seat.isCoupleSeat
+    );
+
+    // Group adjacent couple seats
+    coupleSeats.forEach((seat) => {
+      if (processedSeatIds.has(seat.id)) return;
+
+      // Find adjacent couple seat in the same row
+      const rowMatch = seat.seatNumber.match(/^([A-Z])(\d+)$/);
+      if (!rowMatch) {
+        if (!seatsByType["COUPLE"]) {
+          seatsByType["COUPLE"] = [];
         }
-      } else {
-        // Regular seat
-        const type = seat.type || "NORMAL";
-        if (!seatsByType[type]) {
-          seatsByType[type] = [];
-        }
-        seatsByType[type].push(seat);
+        seatsByType["COUPLE"].push(seat);
+        processedSeatIds.add(seat.id);
+        return;
       }
+
+      const rowLetter = rowMatch[1];
+      const seatNum = parseInt(rowMatch[2]);
+
+      // Look for adjacent couple seat
+      const adjacentSeat = coupleSeats.find((s) => {
+        if (s.id === seat.id || processedSeatIds.has(s.id)) return false;
+        const sRowMatch = s.seatNumber.match(/^([A-Z])(\d+)$/);
+        if (!sRowMatch) return false;
+        return (
+          sRowMatch[1] === rowLetter &&
+          (parseInt(sRowMatch[2]) === seatNum + 1 ||
+            parseInt(sRowMatch[2]) === seatNum - 1)
+        );
+      });
+
+      if (adjacentSeat) {
+        // Found adjacent couple seat
+        const adjRowMatch = adjacentSeat.seatNumber.match(/^([A-Z])(\d+)$/);
+        const adjSeatNum = adjRowMatch ? parseInt(adjRowMatch[2]) : seatNum;
+        const minNum = Math.min(seatNum, adjSeatNum);
+        const maxNum = Math.max(seatNum, adjSeatNum);
+
+        const couplePair: SeatData = {
+          ...seat,
+          seatNumber: `${rowLetter}${minNum}-${maxNum}`,
+        };
+
+        if (!seatsByType["COUPLE"]) {
+          seatsByType["COUPLE"] = [];
+        }
+        seatsByType["COUPLE"].push(couplePair);
+        processedSeatIds.add(seat.id);
+        processedSeatIds.add(adjacentSeat.id);
+      } else {
+        if (!seatsByType["COUPLE"]) {
+          seatsByType["COUPLE"] = [];
+        }
+        seatsByType["COUPLE"].push(seat);
+        processedSeatIds.add(seat.id);
+      }
+    });
+
+    // Add regular seats
+    seatsData.forEach((seat) => {
+      if (processedSeatIds.has(seat.id)) return;
+
+      const type = seat.type || "NORMAL";
+      if (!seatsByType[type]) {
+        seatsByType[type] = [];
+      }
+      seatsByType[type].push(seat);
     });
 
     return seatsByType;
@@ -316,7 +435,7 @@ export const Ticket = ({ booking }: TicketProps) => {
               <View className="flex-row justify-between">
                 <Text className={`${textMuted} text-sm`}>Ghế</Text>
                 <Text className={`${textColor} text-sm font-medium`}>
-                  {seatsData.map((s) => s.seatNumber).join(", ") || "N/A"}
+                  {formatSeatNumbers()}
                 </Text>
               </View>
               <View className="flex-row justify-between">
@@ -346,7 +465,37 @@ export const Ticket = ({ booking }: TicketProps) => {
 
                 const seatCount = seats.length;
 
-                const totalPrice = seats.reduce((sum, seat: any) => {
+                // Calculate total price
+                const totalPrice = seats.reduce((sum, seat: SeatData) => {
+                  if (type === "COUPLE" && seat.seatNumber.includes("-")) {
+                    const match = seat.seatNumber.match(/^([A-Z])(\d+)-(\d+)$/);
+                    if (match) {
+                      const rowLetter = match[1];
+                      const startNum = parseInt(match[2]);
+                      const endNum = parseInt(match[3]);
+
+                      const pairSeats = seatsData.filter((s) => {
+                        const sMatch = s.seatNumber.match(/^([A-Z])(\d+)$/);
+                        if (!sMatch) return false;
+                        return (
+                          sMatch[1] === rowLetter &&
+                          parseInt(sMatch[2]) >= startNum &&
+                          parseInt(sMatch[2]) <= endNum
+                        );
+                      });
+
+                      // Sum price for both seats in the pair
+                      return (
+                        sum +
+                        pairSeats.reduce((pairSum, pairSeat) => {
+                          const extra = pairSeat?.extraPrice || 0;
+                          return pairSum + (basePrice + extra);
+                        }, 0)
+                      );
+                    }
+                  }
+
+                  // Regular seat or individual couple seat
                   const extra = seat?.extraPrice || 0;
                   return sum + (basePrice + extra);
                 }, 0);

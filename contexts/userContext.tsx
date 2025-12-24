@@ -78,7 +78,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.error("Failed to fetch user profile:", error);
       await authService.logout();
       setUser(null);
       setIsAuthenticated(false);
