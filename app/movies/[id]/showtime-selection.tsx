@@ -97,12 +97,18 @@ export default function ShowtimeSelectionScreen() {
   const filteredShowtimes = useMemo(() => {
     if (!selectedDate || !showtimes.length) return [];
 
+    const formatLocalDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
     const filtered = showtimes
       .filter((showtime) => {
-        const showtimeDate = new Date(showtime.startTime)
-          .toISOString()
-          .split("T")[0];
-        return showtimeDate === selectedDate.fullDate;
+        const showtimeDate = new Date(showtime.startTime);
+        const showtimeDateStr = formatLocalDate(showtimeDate);
+        return showtimeDateStr === selectedDate.fullDate;
       })
       .sort((a, b) => {
         return (
@@ -300,10 +306,14 @@ export default function ShowtimeSelectionScreen() {
         setCinemaDetails(cinema);
       }
 
-      // Set default date to today
-      const todayOption = dateOptions.find(
-        (opt) => opt.fullDate === today.toISOString().split("T")[0]
-      );
+      const formatLocalDate = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+      const todayStr = formatLocalDate(today);
+      const todayOption = dateOptions.find((opt) => opt.fullDate === todayStr);
       if (todayOption) {
         setSelectedDate(todayOption);
       }

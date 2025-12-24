@@ -406,7 +406,7 @@ export const Ticket = ({ booking }: TicketProps) => {
           </View>
 
           {/* QR Code */}
-          <View className="items-center py-2">
+          <View className="items-center py-2 my-4">
             <View className="bg-white p-2 rounded-lg">
               <QRCode
                 value={generateBookingQRData(booking)}
@@ -454,7 +454,7 @@ export const Ticket = ({ booking }: TicketProps) => {
           </View>
 
           {/* Order Information Section */}
-          <View className="space-y-2">
+          <View className="space-y-2 mt-4">
             <Text className={`${textColor} text-base font-black text-center`}>
               Thông tin đơn hàng
             </Text>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,17 +9,25 @@ import { useTheme } from "@/contexts/themeContext";
 import { paymentService } from "@/services/payment";
 import { bookingService } from "@/services/booking";
 import { useToast } from "@/contexts/toastContext";
+import { useUser } from "@/contexts/userContext";
+import { notificationService } from "@/services/notification";
+import { generateTicketHTML } from "@/utils/ticketHtmlGenerator";
+import { showtimeSelectionService } from "@/services/showtime-selection";
+import { fooddrinkService } from "@/services/fooddrink";
+import { formatDate } from "@/utils/dayUtils";
 
 type Status = "pending" | "success" | "failed";
+type PaymentMethod = "COD" | "MOMO" | "VNPAY" | "ZALOPAY";
 
 export default function BookingSuccessScreen() {
   const router = useRouter();
   const { isDark } = useTheme();
   const { showToast } = useToast();
+  const { user } = useUser();
   const params = useLocalSearchParams<{
     bookingId?: string;
     amount?: string;
-    method?: string;
+    method?: PaymentMethod;
   }>();
 
   const [status, setStatus] = useState<Status>("pending");
@@ -32,6 +40,7 @@ export default function BookingSuccessScreen() {
   const [amount, setAmount] = useState<number | null>(
     params.amount ? Number(params.amount) : null
   );
+  const emailSentRef = useRef<Set<string>>(new Set());
 
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
   const cardBg = isDark ? "bg-slate-900" : "bg-slate-50";
@@ -40,6 +49,161 @@ export default function BookingSuccessScreen() {
   const successColor = "#22c55e";
   const errorColor = "#ef4444";
 
+  const sendBookingEmail = async (booking: any) => {
+    if (!user?.email) {
+      showToast("Email không khả dụng, không thể gửi email xác nhận", "error");
+      return;
+    }
+
+    if (emailSentRef.current.has(booking.id)) {
+      showToast(
+        "Email xác nhận đã được gửi cho đặt vé này, không thể gửi lại",
+        "error"
+      );
+      return;
+    }
+
+    try {
+      // Fetch all ticket data
+      const showtimeDetails = await showtimeSelectionService.getShowtimeById(
+        booking.showtimeId
+      );
+
+      const [movieDetails, cinemaDetails, roomDetails] = await Promise.all([
+        showtimeSelectionService
+          .getMovieDetails(showtimeDetails.movieId)
+          .catch(() => null),
+        showtimeSelectionService
+          .getCinemaDetails(showtimeDetails.cinemaId)
+          .catch(() => null),
+        showtimeSelectionService
+          .getRoomById(showtimeDetails.roomId)
+          .catch(() => null),
+      ]);
+
+      // Format start time
+      const startTimeDate = new Date(showtimeDetails.startTime);
+      const formattedStartTime = startTimeDate.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const formattedShowtime = `${formattedStartTime} ${formatDate(startTimeDate)}`;
+
+      // Get seat data
+      const seatMap = new Map<string, any>();
+      if (roomDetails?.seats && Array.isArray(roomDetails.seats)) {
+        roomDetails.seats.forEach((seat: any) => {
+          seatMap.set(seat.id, seat);
+        });
+      }
+
+      const seatsData =
+        booking.bookingSeats?.map((bookingSeat: any) => {
+          const seatData = seatMap.get(bookingSeat.seatId);
+          if (seatData) {
+            const rowMatch = seatData.seatNumber?.match(/^([A-Z])/i);
+            const row = rowMatch ? rowMatch[1].toUpperCase() : "A";
+            return {
+              id: bookingSeat.seatId,
+              seatNumber: seatData.seatNumber || bookingSeat.seatId,
+              row,
+              type: seatData.seatType || "NORMAL",
+              extraPrice: seatData.extraPrice || 0,
+            };
+          }
+          return undefined;
+        }) || [];
+
+      // Get food/drinks data
+      const foodDrinksData: Array<{
+        name: string;
+        quantity: number;
+        price: number;
+      }> = [];
+      if (booking.bookingFoodDrinks && booking.bookingFoodDrinks.length > 0) {
+        try {
+          const foodDrinkIds = booking.bookingFoodDrinks.map(
+            (bfd: any) => bfd.foodDrinkId
+          );
+          const foodDrinks =
+            await fooddrinkService.getFoodDrinksByIds(foodDrinkIds);
+
+          booking.bookingFoodDrinks.forEach((bfd: any) => {
+            const foodDrink = foodDrinks.find(
+              (fd) => fd.id === bfd.foodDrinkId
+            );
+            foodDrinksData.push({
+              name: foodDrink?.name || "N/A",
+              quantity: bfd.quantity,
+              price: bfd.totalPrice,
+            });
+          });
+        } catch (error) {
+          console.warn("Failed to fetch food drinks for email:", error);
+        }
+      }
+
+      // Calculate seats price
+      const foodDrinksTotal = foodDrinksData.reduce(
+        (sum, fd) => sum + fd.price,
+        0
+      );
+      const seatsPrice = booking.totalPrice - foodDrinksTotal;
+
+      // Get room extra prices
+      const roomExtraPrices: {
+        VIP?: number;
+        COUPLE?: number;
+        NORMAL?: number;
+      } = {};
+      if (roomDetails?.extraPrices) {
+        roomExtraPrices.VIP = roomDetails.extraPrices.VIP || 0;
+        roomExtraPrices.COUPLE = roomDetails.extraPrices.COUPLE || 0;
+        roomExtraPrices.NORMAL = roomDetails.extraPrices.NORMAL || 0;
+      }
+
+      const ticketHTML = await generateTicketHTML({
+        movieTitle: movieDetails?.title || "N/A",
+        cinemaName: cinemaDetails?.name || "N/A",
+        cinemaAddress: cinemaDetails?.address || "N/A",
+        roomName: roomDetails?.name || "N/A",
+        date: formatDate(startTimeDate),
+        startTime: formattedShowtime,
+        seatsData: seatsData.filter(Boolean) as any,
+        foodDrinks: foodDrinksData,
+        seatsPrice,
+        showtimePrice: showtimeDetails.price || 0,
+        totalPrice: booking.totalPrice,
+        bookingId: booking.id,
+        roomExtraPrices,
+      });
+
+      // Send email
+      await notificationService.sendEmail({
+        to: user.email,
+        subject: `Xác nhận đặt vé - ${movieDetails?.title || "CinemaGo"}`,
+        html: ticketHTML,
+      });
+
+      // Mark email as sent for this booking
+      emailSentRef.current.add(booking.id);
+      showToast("Email xác nhận đặt vé đã được gửi thành công", "success");
+    } catch (error: any) {
+      console.error("Failed to send booking email:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        stack: error?.stack,
+      });
+      showToast(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Không thể gửi email xác nhận. Vui lòng thử lại sau.",
+        "error"
+      );
+    }
+  };
+
   useEffect(() => {
     const checkPaymentStatus = async () => {
       if (params.method === "COD") {
@@ -47,6 +211,17 @@ export default function BookingSuccessScreen() {
         setMessage(
           "Đặt vé thành công. Vui lòng thanh toán tại quầy trước khi vào rạp."
         );
+
+        const resolvedBookingId =
+          (typeof params.bookingId === "string" && params.bookingId) ||
+          (await AsyncStorage.getItem("bookingId"));
+        if (resolvedBookingId) {
+          try {
+            const booking =
+              await bookingService.getBookingById(resolvedBookingId);
+            sendBookingEmail(booking);
+          } catch (error) {}
+        }
         return;
       }
 
@@ -75,30 +250,80 @@ export default function BookingSuccessScreen() {
             await bookingService.getBookingById(resolvedBookingId);
           if ((booking as any)?.status === "Đã thanh toán") {
             setStatus("success");
-            setMessage("Thanh toán và đặt vé thành công!");
+
+            if (params.method === "MOMO") {
+              setMessage(
+                "Thanh toán MoMo thành công. Đặt vé của bạn đã được xác nhận."
+              );
+            } else if (params.method === "VNPAY") {
+              setMessage(
+                "Thanh toán VNPAY thành công. Đặt vé của bạn đã được xác nhận."
+              );
+            } else if (params.method === "ZALOPAY") {
+              setMessage(
+                "Thanh toán ZaloPay thành công. Đặt vé của bạn đã được xác nhận."
+              );
+            } else {
+              setMessage("Thanh toán và đặt vé thành công!");
+            }
+
+            setAmount(booking.totalPrice ?? amount ?? null);
             await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
+
+            // Send email notification
+            sendBookingEmail(booking);
             return;
           }
         } catch (err) {
-          console.warn("Cannot fetch booking before MoMo check", err);
+          console.warn("Cannot fetch booking before payment check", err);
         }
 
-        try {
-          await paymentService.checkMoMoStatus(resolvedBookingId);
+        if (params.method === "MOMO") {
+          try {
+            await paymentService.checkMoMoStatus(resolvedBookingId);
 
-          const updatedBooking =
-            await bookingService.getBookingById(resolvedBookingId);
-          setAmount(updatedBooking.totalPrice ?? null);
+            const updatedBooking =
+              await bookingService.getBookingById(resolvedBookingId);
+            setAmount(updatedBooking.totalPrice ?? null);
 
-          setStatus("success");
-          setMessage(
-            "Thanh toán MoMo thành công. Đặt vé của bạn đã được xác nhận."
-          );
+            setStatus("success");
+            setMessage(
+              "Thanh toán MoMo thành công. Đặt vé của bạn đã được xác nhận."
+            );
 
-          await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
-        } catch (error: any) {
-          setStatus("failed");
-          setMessage("Thanh toán không thành công hoặc đã bị hủy.");
+            await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
+
+            // Send email notification
+            sendBookingEmail(updatedBooking);
+          } catch (error: any) {
+            setStatus("failed");
+            setMessage("Thanh toán không thành công hoặc đã bị hủy.");
+          }
+          return;
+        }
+
+        if (params.method === "ZALOPAY") {
+          try {
+            await paymentService.checkZaloPayStatus(resolvedBookingId);
+
+            const updatedBooking =
+              await bookingService.getBookingById(resolvedBookingId);
+            setAmount(updatedBooking.totalPrice ?? null);
+
+            setStatus("success");
+            setMessage(
+              "Thanh toán ZaloPay thành công. Đặt vé của bạn đã được xác nhận."
+            );
+
+            await AsyncStorage.multiRemove(["bookingId", "paymentAmount"]);
+
+            // Send email notification
+            sendBookingEmail(updatedBooking);
+          } catch (error: any) {
+            setStatus("failed");
+            setMessage("Thanh toán không thành công hoặc đã bị hủy.");
+          }
+          return;
         }
       } catch (error: any) {
         console.error("Error while checking payment status:", error);

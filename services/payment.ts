@@ -43,13 +43,19 @@ export const paymentService = {
   // Checkout with VnPay
   checkoutWithVnPay: async (
     amount: number,
-    bookingId: string
+    bookingId: string,
+    urlCheckoutCompleted?: string
   ): Promise<PaymentResponse> => {
     try {
-      const response = await axiosConfig.post(`/payments/vnpay/checkout`, {
-        amount,
-        bookingId,
-      });
+      const response = await axiosConfig.post(
+        `/payments/vnpay/checkout`,
+        {
+          amount,
+          bookingId,
+          urlCheckoutCompleted,
+        },
+        { requiresAuth: true } as any
+      );
 
       return response.data;
     } catch (error: any) {
@@ -62,13 +68,19 @@ export const paymentService = {
   // Checkout with ZaloPay
   checkoutWithZaloPay: async (
     amount: number,
-    bookingId: string
+    bookingId: string,
+    urlCheckoutCompleted?: string
   ): Promise<PaymentResponse> => {
     try {
-      const response = await axiosConfig.post(`/payments/zalopay/checkout`, {
-        amount,
-        bookingId,
-      });
+      const response = await axiosConfig.post(
+        `/payments/zalopay/checkout`,
+        {
+          amount,
+          bookingId,
+          urlCheckoutCompleted,
+        },
+        { requiresAuth: true } as any
+      );
 
       return response.data;
     } catch (error: any) {
@@ -83,6 +95,22 @@ export const paymentService = {
     try {
       const response = await axiosConfig.get(
         `/payments/public/momo/status/${paymentId}`
+      );
+
+      return response.data.data;
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  checkZaloPayStatus: async (bookingId: string): Promise<Payment> => {
+    try {
+      const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+      const bookingIdWithoutDashes = bookingId.replace(/-/g, "");
+      const app_trans_id = `${dateStr}_${bookingIdWithoutDashes}`;
+
+      const response = await axiosConfig.get(
+        `/payments/public/zalopay/status/${app_trans_id}`
       );
 
       return response.data.data;

@@ -16,7 +16,6 @@ import { useToast } from "@/contexts/toastContext";
 import { Ticket } from "@/components/ticket";
 import { bookingService, Booking as ServiceBooking } from "@/services/booking";
 import { Booking } from "@/types/booking";
-import { generateBookingQRData } from "@/utils/qrCodeHelpers";
 import { showtimeSelectionService } from "@/services/showtime-selection";
 import { formatDate } from "@/utils/dayUtils";
 
@@ -52,28 +51,6 @@ export default function MyTickets() {
           } catch (error) {
             console.warn(
               `Failed to fetch showtime for booking ${serviceBooking.id}:`,
-              error
-            );
-          }
-
-          // Generate QR code data
-          try {
-            generateBookingQRData({
-              id: serviceBooking.id,
-              userId: serviceBooking.userId,
-              showtimeId: serviceBooking.showtimeId,
-              totalPrice: serviceBooking.totalPrice,
-              bookingSeats: serviceBooking.bookingSeats.map((seat) => ({
-                seatId: seat.seatId,
-              })),
-              createdAt:
-                serviceBooking.createdAt instanceof Date
-                  ? serviceBooking.createdAt
-                  : new Date(serviceBooking.createdAt),
-            });
-          } catch (error) {
-            console.error(
-              `Failed to generate QR code for booking ${serviceBooking.id}:`,
               error
             );
           }

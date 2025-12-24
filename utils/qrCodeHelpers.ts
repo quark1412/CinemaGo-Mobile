@@ -7,68 +7,43 @@ export interface BookingQRData {
   createdAt: string;
 }
 
-// Generate QR code data string for a booking
+export const generateBookingQRData = (booking: { id: string }): string => {
+  const bookingId = booking.id;
 
-export const generateBookingQRData = (booking: {
-  id: string;
-  userId?: string;
-  showtimeId: string;
-  totalPrice: number;
-  bookingSeats: Array<{ seatId: string }>;
-  createdAt: Date;
-}): string => {
-  const qrData: BookingQRData = {
-    bookingId: booking.id,
-    userId: booking.userId,
-    showtimeId: booking.showtimeId,
-    totalPrice: booking.totalPrice,
-    seats: booking.bookingSeats.map((seat) => seat.seatId),
-    createdAt: booking.createdAt.toISOString(),
-  };
-
-  return JSON.stringify(qrData);
+  return JSON.stringify({
+    bookingId: bookingId,
+  });
 };
-
-// Parse QR code data string back to booking information
 
 export const parseBookingQRData = (
   qrDataString: string
-): BookingQRData | null => {
+): { bookingId: string } | null => {
   try {
     const parsed = JSON.parse(qrDataString);
 
-    // Validate required fields
-    if (
-      !parsed.bookingId ||
-      !parsed.showtimeId ||
-      !parsed.totalPrice ||
-      !Array.isArray(parsed.seats)
-    ) {
-      console.error("Invalid QR data structure");
-      return null;
+    if (parsed.bookingId && typeof parsed.bookingId === "string") {
+      return {
+        bookingId: parsed.bookingId,
+      };
     }
 
-    return {
-      bookingId: parsed.bookingId,
-      userId: parsed.userId,
-      showtimeId: parsed.showtimeId,
-      totalPrice: parsed.totalPrice,
-      seats: parsed.seats,
-      createdAt: parsed.createdAt,
-    };
+    console.error("Invalid QR data structure - missing bookingId");
+    return null;
   } catch (error) {
     console.error("Failed to parse QR code data:", error);
     return null;
   }
 };
 
-export const validateBookingQR = (
-  qrData: BookingQRData
-): {
+export const validateBookingQR = (bookingData: {
+  id: string;
+  createdAt: Date | string;
+  bookingSeats?: Array<{ seatId: string }>;
+}): {
   isValid: boolean;
   reason?: string;
 } => {
-  const bookingDate = new Date(qrData.createdAt);
+  const bookingDate = new Date(bookingData.createdAt);
   const now = new Date();
 
   if (bookingDate > now) {
@@ -88,7 +63,7 @@ export const validateBookingQR = (
     };
   }
 
-  if (!qrData.seats || qrData.seats.length === 0) {
+  if (!bookingData.bookingSeats || bookingData.bookingSeats.length === 0) {
     return {
       isValid: false,
       reason: "No seats found in booking",
@@ -100,19 +75,22 @@ export const validateBookingQR = (
   };
 };
 
-// Format booking QR data for display
-
-export const formatBookingForDisplay = (qrData: BookingQRData) => {
+export const formatBookingForDisplay = (booking: {
+  id: string;
+  totalPrice: number;
+  bookingSeats: Array<{ seatId: string }>;
+  createdAt: Date | string;
+}) => {
   return {
-    bookingId: qrData.bookingId.toUpperCase(),
-    shortBookingId: qrData.bookingId.slice(-8).toUpperCase(),
+    bookingId: booking.id.toUpperCase(),
+    shortBookingId: booking.id.slice(-8).toUpperCase(),
     formattedPrice: new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(qrData.totalPrice),
-    seatCount: qrData.seats.length,
-    seatList: qrData.seats.join(", "),
-    bookingDate: new Date(qrData.createdAt).toLocaleDateString("en-US", {
+    }).format(booking.totalPrice),
+    seatCount: booking.bookingSeats?.length || 0,
+    seatList: booking.bookingSeats?.map((s) => s.seatId).join(", ") || "",
+    bookingDate: new Date(booking.createdAt).toLocaleDateString("en-US", {
       weekday: "short",
       year: "numeric",
       month: "short",
@@ -125,8 +103,6 @@ export const formatBookingForDisplay = (qrData: BookingQRData) => {
 
 export const generateSimpleBookingQR = (bookingId: string): string => {
   return JSON.stringify({
-    type: "cinemago_booking",
-    id: bookingId,
-    timestamp: Date.now(),
+    bookingId: bookingId,
   });
 };
