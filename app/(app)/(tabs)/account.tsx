@@ -31,21 +31,26 @@ export default function Account() {
 
   useEffect(() => {
     (async () => {
+      if (!user?.id) return;
       try {
         setCheckingBio(true);
         const supported = await canUseBiometric();
         setBioSupported(supported);
-        setBioEnabled(await isBiometricEnabled());
+        setBioEnabled(await isBiometricEnabled(user.id));
       } finally {
         setCheckingBio(false);
       }
     })();
-  }, []);
+  }, [user?.id]);
 
   const onToggleBiometric = async () => {
+    if (!user?.id) {
+      showToast("Vui lòng đăng nhập lại để thực hiện.");
+      return;
+    }
     try {
       if (bioEnabled) {
-        await disableBiometricLogin();
+        await disableBiometricLogin(user.id);
         setBioEnabled(false);
         showToast("Đã tắt đăng nhập sinh trắc học");
         return;
@@ -62,7 +67,7 @@ export default function Account() {
         return;
       }
 
-      const ok = await enableBiometricLogin(currentRefreshToken);
+      const ok = await enableBiometricLogin(user.id, currentRefreshToken);
       setBioEnabled(!!ok);
       showToast(ok ? "Đã bật đăng nhập sinh trắc học" : "Không thể bật");
     } catch {
@@ -80,7 +85,7 @@ export default function Account() {
     >
       <View className="flex-row items-center justify-between p-4">
         <Text className="text-2xl text-center font-[bold] text-foreground">
-          Account
+          Tài khoản
         </Text>
         <TouchableOpacity
           onPress={toggleTheme}
@@ -120,7 +125,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              Edit Profile
+              Sửa thông tin
             </Text>
           </TouchableOpacity>
 
@@ -134,7 +139,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              Change Password
+              Đổi mật khẩu
             </Text>
           </TouchableOpacity>
 
@@ -148,39 +153,36 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              My Tickets
+              Vé của tôi
             </Text>
           </TouchableOpacity>
 
-          {bioSupported && (
-            <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="finger-print-outline"
-                  size={24}
-                  color={isDark ? "#fff" : "#1f2937"}
-                />
-                <View className="ml-3">
-                  <Text className="font-[semibold] text-foreground">
-                    Đăng nhập sinh trắc học
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={bioEnabled}
-                onValueChange={onToggleBiometric}
-                disabled={!bioSupported || checkingBio}
+          <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
+            <View className="flex-row items-center">
+              <Ionicons
+                name="finger-print-outline"
+                size={24}
+                color={isDark ? "#fff" : "#1f2937"}
               />
+              <View className="ml-3">
+                <Text className="font-[semibold] text-foreground">
+                  Đăng nhập sinh trắc học
+                </Text>
+              </View>
             </View>
-          )}
+            <Switch
+              value={bioEnabled}
+              onValueChange={onToggleBiometric}
+              disabled={checkingBio}
+            />
+          </View>
         </View>
 
         <TouchableOpacity
-          className={`flex-row items-center p-4 ${
-            isDark
-              ? "bg-red-900/20 border-red-800/50"
-              : "bg-red-50 border-red-200"
-          } rounded-xl border mt-auto`}
+          className={`flex-row items-center p-4 ${isDark
+            ? "bg-red-900/20 border-red-800/50"
+            : "bg-red-50 border-red-200"
+            } rounded-xl border mt-auto`}
           onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
