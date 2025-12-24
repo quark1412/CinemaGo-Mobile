@@ -1,8 +1,4 @@
 import instance from "@/configs/axiosConfig";
-import {
-  isBiometricEnabled,
-  updateBiometricToken,
-} from "@/services/users/biometric";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const authService = {
@@ -42,10 +38,6 @@ export const authService = {
 
     await AsyncStorage.setItem("accessToken", accessToken);
     await AsyncStorage.setItem("refreshToken", newRefreshToken);
-
-    if (await isBiometricEnabled()) {
-      await updateBiometricToken(newRefreshToken);
-    }
 
     return { accessToken, refreshToken: newRefreshToken };
   },
@@ -90,11 +82,16 @@ export const authService = {
     }
   },
 
-  getProfile: async () => {
+  getProfile: async (token?: string) => {
     try {
-      const response = await instance.get(`/users/profile`, {
+      const config: any = {
         requiresAuth: true,
-      } as any);
+      };
+      if (token) {
+        config.headers = { Authorization: `Bearer ${token}` };
+      }
+
+      const response = await instance.get(`/users/profile`, config);
       console.log("profile nè: ", response.data.data);
 
       return response.data.data;
@@ -111,8 +108,8 @@ export const authService = {
         headers:
           data instanceof FormData
             ? {
-                "Content-Type": "multipart/form-data",
-              }
+              "Content-Type": "multipart/form-data",
+            }
             : undefined,
       });
       return response.data;
