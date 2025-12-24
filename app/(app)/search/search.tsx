@@ -217,11 +217,10 @@ export default function SearchScreen() {
 
               <TouchableOpacity
                 onPress={toggleFilterPanel}
-                className={`ml-3 p-2 rounded-lg border ${
-                  showFilter
+                className={`ml-3 p-2 rounded-lg border ${showFilter
                     ? "bg-orange-50 border-orange-500"
                     : "bg-white border-gray-200"
-                }`}
+                  }`}
               >
                 <Ionicons
                   name="options-outline"
@@ -245,11 +244,10 @@ export default function SearchScreen() {
                       <TouchableOpacity
                         key={opt.id}
                         onPress={() => setSelectedStatus(opt.id)}
-                        className={`mr-2 px-4 py-2 rounded-full border ${
-                          selectedStatus === opt.id
+                        className={`mr-2 px-4 py-2 rounded-full border ${selectedStatus === opt.id
                             ? "bg-orange-500 border-orange-500"
                             : "bg-white border-gray-300"
-                        }`}
+                          }`}
                       >
                         <Text
                           className={`text-[13px] font-medium ${selectedStatus === opt.id ? "text-white" : "text-gray-600"}`}
@@ -265,7 +263,7 @@ export default function SearchScreen() {
                       Điểm đánh giá
                     </Text>
                     <Text className="text-orange-500 font-bold">
-                      {minRating}/5{" "}
+                      ≥ {minRating}/5{" "}
                       <Ionicons name="star" size={14} color="#FFD700" />
                     </Text>
                   </View>
@@ -278,11 +276,10 @@ export default function SearchScreen() {
                       <TouchableOpacity
                         key={star}
                         onPress={() => setMinRating(star)}
-                        className={`mr-2 w-10 h-10 rounded-full items-center justify-center border ${
-                          minRating === star
+                        className={`mr-2 w-10 h-10 rounded-full items-center justify-center border ${minRating === star
                             ? "bg-orange-500 border-orange-500"
                             : "bg-white border-gray-200"
-                        }`}
+                          }`}
                       >
                         <Text
                           className={`font-bold ${minRating === star ? "text-white" : "text-gray-600"}`}
@@ -305,11 +302,10 @@ export default function SearchScreen() {
                           <TouchableOpacity
                             key={gId}
                             onPress={() => toggleGenre(gId)}
-                            className={`px-3 py-2 rounded-lg border ${
-                              isSelected
+                            className={`px-3 py-2 rounded-lg border ${isSelected
                                 ? "bg-orange-50 border-orange-500"
                                 : "bg-white border-gray-200"
-                            }`}
+                              }`}
                           >
                             <Text
                               className={`text-[12px] font-medium ${isSelected ? "text-orange-600" : "text-gray-600"}`}

@@ -4,8 +4,9 @@ import { useToast } from "@/contexts/toastContext";
 import { useUser } from "@/contexts/userContext";
 import { authService } from "@/services/users/auth";
 import {
-  disableBiometricLogin,
+  isBiometricEnabled,
   signInWithBiometric,
+  updateBiometricToken
 } from "@/services/users/biometric";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -44,6 +45,7 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
 
   const [bioSupported, setBioSupported] = useState(false);
+  const [isBioEnabled, setIsBioEnabled] = useState(false);
   const [bioLabel, setBioLabel] = useState<
     "Face ID" | "Touch ID" | "Biometric"
   >("Biometric");
@@ -75,6 +77,8 @@ export default function SignIn() {
           setBioSupported(false);
         }
       } finally {
+        const enabled = await isBiometricEnabled();
+        setIsBioEnabled(enabled);
         setCheckingBio(false);
       }
     })();
@@ -104,6 +108,15 @@ export default function SignIn() {
 
   const onBiometric = async () => {
     try {
+      const enabled = await isBiometricEnabled();
+      if (!enabled) {
+        showToast(
+          "Vui lòng đăng nhập bằng mật khẩu và kích hoạt trong cài đặt.",
+          "error"
+        );
+        return;
+      }
+
       const storedRefreshToken = await signInWithBiometric();
       console.log("Biometric refresh token:", storedRefreshToken);
       if (!storedRefreshToken) {
@@ -114,13 +127,19 @@ export default function SignIn() {
         return;
       }
 
-      await authService.loginWithRefreshToken(storedRefreshToken);
+      const { refreshToken: newRefreshToken } =
+        await authService.loginWithRefreshToken(storedRefreshToken);
 
       await refreshUser();
 
+      const userData = await authService.getProfile();
+      if (userData?.id) {
+        await updateBiometricToken(userData.id, newRefreshToken);
+      }
+
       router.replace("/(app)/(tabs)/home");
     } catch (e) {
-      await disableBiometricLogin();
+
       await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
       showToast("Phiên sinh trắc học đã hết hạn, hãy đăng nhập lại.", "error");
       router.replace("/(app)/auth/sign-in");
@@ -255,11 +274,10 @@ export default function SignIn() {
                 <Pressable
                   onPress={onSignIn}
                   disabled={loading || !email || !pwd}
-                  className={`mt-6 rounded-xl px-4 py-3 items-center justify-center overflow-hidden ${
-                    loading || !email || !pwd
-                      ? "bg-yellow-300/60"
-                      : "bg-[#eab308]"
-                  }`}
+                  className={`mt-6 rounded-xl px-4 py-3 items-center justify-center overflow-hidden ${loading || !email || !pwd
+                    ? "bg-yellow-300/60"
+                    : "bg-[#eab308]"
+                    }`}
                 >
                   <Text className="text-black font-semibold">
                     {loading ? "Đang đăng nhập..." : "Đăng nhập"}

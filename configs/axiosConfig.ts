@@ -87,22 +87,18 @@ instance.interceptors.request.use(
   }
 );
 
-// Add response interceptor for better error handling
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      // Server responded with error
       console.error(
         "API Error:",
         error.response.status,
         error.response.data?.message || error.message
       );
     } else if (error.request) {
-      // Request made but no response
       console.error("Network Error: No response received", error.message);
     } else {
-      // Something else happened
       console.error("Request Error:", error.message);
     }
     return Promise.reject(error);

@@ -1,9 +1,13 @@
 // services/biometric.ts
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as LocalAuth from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
-const FLAG = "biometric_enabled";
-const SECRET = "BIOMETRIC_REFRESH_TOKEN";
+const BIOMETRIC_ENABLED_USER_ID = "BIOMETRIC_ENABLED_USER_ID";
+const BIOMETRIC_REFRESH_TOKEN_PREFIX = "BIOMETRIC_REFRESH_TOKEN_";
+
+const getBiometricTokenKey = (userId: string) =>
+  `${BIOMETRIC_REFRESH_TOKEN_PREFIX}${userId}`;
 
 export async function canUseBiometric() {
   const hw = await LocalAuth.hasHardwareAsync();
@@ -11,7 +15,14 @@ export async function canUseBiometric() {
   return hw && enrolled;
 }
 
-export async function enableBiometricLogin(refreshToken: string) {
+export async function getBiometricUserId(): Promise<string | null> {
+  return await AsyncStorage.getItem(BIOMETRIC_ENABLED_USER_ID);
+}
+
+export async function enableBiometricLogin(
+  userId: string,
+  refreshToken: string
+) {
   try {
     const canUse = await canUseBiometric();
     if (!canUse) return false;
@@ -22,10 +33,9 @@ export async function enableBiometricLogin(refreshToken: string) {
     });
     if (!ok.success) return false;
 
-    console.log("refreshtoken nè: ", refreshToken);
+    await SecureStore.setItemAsync(getBiometricTokenKey(userId), refreshToken, {});
+    await AsyncStorage.setItem(BIOMETRIC_ENABLED_USER_ID, userId);
 
-    await SecureStore.setItemAsync(SECRET, refreshToken, {});
-    await SecureStore.setItemAsync(FLAG, "1");
     return true;
   } catch (e) {
     console.log("enableBiometricLogin error", e);
@@ -33,18 +43,33 @@ export async function enableBiometricLogin(refreshToken: string) {
   }
 }
 
-export async function disableBiometricLogin() {
-  await SecureStore.deleteItemAsync(SECRET);
-  await SecureStore.deleteItemAsync(FLAG);
+export async function disableBiometricLogin(userId: string) {
+  try {
+    await SecureStore.deleteItemAsync(getBiometricTokenKey(userId));
+
+    const currentEnabledUser = await getBiometricUserId();
+    if (currentEnabledUser === userId) {
+      await AsyncStorage.removeItem(BIOMETRIC_ENABLED_USER_ID);
+    }
+  } catch (e) {
+    console.log("disableBiometricLogin error", e);
+  }
 }
 
-export async function isBiometricEnabled() {
-  return (await SecureStore.getItemAsync(FLAG)) === "1";
+export async function isBiometricEnabled(userId?: string) {
+  const enabledUserId = await getBiometricUserId();
+  if (userId) {
+    return enabledUserId === userId;
+  }
+  return !!enabledUserId;
 }
 
 export async function signInWithBiometric(): Promise<string | null> {
   const canUse = await canUseBiometric();
   if (!canUse) return null;
+
+  const enabledUserId = await getBiometricUserId();
+  if (!enabledUserId) return null;
 
   const ok = await LocalAuth.authenticateAsync({
     promptMessage: "Đăng nhập bằng sinh trắc học",
@@ -52,14 +77,31 @@ export async function signInWithBiometric(): Promise<string | null> {
   });
   if (!ok.success) return null;
 
-  const token = await SecureStore.getItemAsync(SECRET);
+  const token = await SecureStore.getItemAsync(getBiometricTokenKey(enabledUserId));
   return token ?? null;
 }
 
-export async function updateBiometricToken(refreshToken: string) {
+export async function updateBiometricToken(
+  userId: string,
+  refreshToken: string
+) {
   try {
-    await SecureStore.setItemAsync(SECRET, refreshToken, {});
+    if (await isBiometricEnabled(userId)) {
+      await SecureStore.setItemAsync(
+        getBiometricTokenKey(userId),
+        refreshToken,
+        {}
+      );
+    }
   } catch (e) {
     console.log("updateBiometricToken error", e);
+  }
+}
+
+export async function clearBiometricDataForUser(userId: string) {
+  await SecureStore.deleteItemAsync(getBiometricTokenKey(userId));
+  const currentEnabledUser = await getBiometricUserId();
+  if (currentEnabledUser === userId) {
+    await AsyncStorage.removeItem(BIOMETRIC_ENABLED_USER_ID);
   }
 }
