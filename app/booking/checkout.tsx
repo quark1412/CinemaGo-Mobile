@@ -19,8 +19,9 @@ import { paymentService } from "@/services/payment";
 import { fooddrinkService, FoodDrink } from "@/services/fooddrink";
 import { useToast } from "@/contexts/toastContext";
 import { useTheme } from "@/contexts/themeContext";
+import * as DeepLinking from "expo-linking";
 
-type PaymentMethod = "COD" | "MOMO";
+type PaymentMethod = "COD" | "MOMO" | "ZALOPAY";
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -152,9 +153,7 @@ export default function CheckoutScreen() {
         quantities[fd.id] = fd.quantity;
       });
       setFoodDrinkQuantities(quantities);
-    } catch (error: any) {
-      console.error("Failed to load food drink details:", error);
-    }
+    } catch (error: any) {}
   };
 
   const handlePayment = async () => {
@@ -241,9 +240,11 @@ export default function CheckoutScreen() {
           return;
         }
         case "MOMO": {
+          const redirectUrl = DeepLinking.createURL("booking/success");
           const momoResponse = await paymentService.checkoutWithMoMo(
             totalAmount,
-            booking.id
+            booking.id,
+            redirectUrl
           );
 
           const paymentUrl = momoResponse.URL;
@@ -265,6 +266,39 @@ export default function CheckoutScreen() {
           } else {
             showToast("Không thể mở trang thanh toán", "error");
             waitingForMoMoReturnRef.current = false;
+          }
+          return;
+        }
+        case "ZALOPAY": {
+          const redirectUrl = DeepLinking.createURL("booking/success");
+          const zaloResponse = await paymentService.checkoutWithZaloPay(
+            totalAmount,
+            booking.id,
+            redirectUrl
+          );
+
+          const paymentUrl = zaloResponse.URL;
+
+          if (!paymentUrl) {
+            showToast("Không thể tạo liên kết thanh toán ZaloPay", "error");
+            return;
+          }
+
+          // Persist identifiers for the booking completed screen
+          try {
+            await AsyncStorage.multiSet([
+              ["bookingId", booking.id],
+              ["paymentAmount", totalAmount.toString()],
+            ]);
+          } catch (storageError) {
+            console.warn("Failed to persist payment identifiers", storageError);
+          }
+
+          const supported = await Linking.canOpenURL(paymentUrl);
+          if (supported) {
+            await Linking.openURL(paymentUrl);
+          } else {
+            showToast("Không thể mở trang thanh toán ZaloPay", "error");
           }
           return;
         }
@@ -642,6 +676,43 @@ export default function CheckoutScreen() {
               }`}
             >
               {selectedPaymentMethod === "MOMO" && (
+                <View className="w-full h-full rounded-full bg-red-600" />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* ZaloPay */}
+          <TouchableOpacity
+            className={`flex-row items-center justify-between p-4 mb-3 rounded-xl border-2 ${
+              selectedPaymentMethod === "ZALOPAY"
+                ? `${cardBg} border-red-600`
+                : `${cardBg} ${isDark ? "border-slate-700" : "border-slate-300"}`
+            }`}
+            onPress={() => setSelectedPaymentMethod("ZALOPAY")}
+          >
+            <View className="flex-row items-center gap-3">
+              <Image
+                source={require("@/assets/images/zalopay_icon.png")}
+                className="w-10 h-10 rounded-lg"
+                resizeMode="cover"
+              />
+              <View>
+                <Text className={`${textColor} font-semibold`}>ZaloPay</Text>
+                <Text className={`${textMuted} text-xs mt-1`}>
+                  Thanh toán qua ví ZaloPay
+                </Text>
+              </View>
+            </View>
+            <View
+              className={`w-5 h-5 rounded-full border-2 ${
+                selectedPaymentMethod === "ZALOPAY"
+                  ? "border-red-600 bg-red-600"
+                  : isDark
+                    ? "border-slate-600"
+                    : "border-slate-400"
+              }`}
+            >
+              {selectedPaymentMethod === "ZALOPAY" && (
                 <View className="w-full h-full rounded-full bg-red-600" />
               )}
             </View>

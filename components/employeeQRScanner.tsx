@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   parseBookingQRData,
@@ -7,47 +13,77 @@ import {
   formatBookingForDisplay,
   BookingQRData,
 } from "@/utils/qrCodeHelpers";
+import { bookingService, Booking } from "@/services/booking";
 
 interface EmployeeQRScannerProps {
-  onBookingVerified?: (bookingData: BookingQRData) => void;
+  onBookingVerified?: (bookingData: Booking) => void;
 }
 
 export const EmployeeQRScanner = ({
   onBookingVerified,
 }: EmployeeQRScannerProps) => {
-  const [scannedData, setScannedData] = useState<BookingQRData | null>(null);
+  const [scannedBooking, setScannedBooking] = useState<Booking | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Simulate QR code scanning (in real app, you'd use a camera scanner)
-  const simulateQRScan = (qrString: string) => {
-    const parsedData = parseBookingQRData(qrString);
+  const simulateQRScan = async (qrString: string) => {
+    setIsLoading(true);
+    try {
+      const parsedData = parseBookingQRData(qrString);
 
-    if (!parsedData) {
+      if (!parsedData || !parsedData.bookingId) {
+        Alert.alert(
+          "Invalid QR Code",
+          "The scanned QR code is not a valid booking code."
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      const booking = await bookingService.getBookingById(parsedData.bookingId);
+
+      const validation = validateBookingQR(booking);
+
+      if (!validation.isValid) {
+        Alert.alert(
+          "Invalid Booking",
+          validation.reason || "This booking is not valid."
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      setScannedBooking(booking);
+      onBookingVerified?.(booking);
+    } catch (error: any) {
+      console.error("Error fetching booking:", error);
       Alert.alert(
-        "Invalid QR Code",
-        "The scanned QR code is not a valid booking code."
+        "Error",
+        error.response?.data?.message || "Failed to fetch booking information."
       );
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const validation = validateBookingQR(parsedData);
-
-    if (!validation.isValid) {
-      Alert.alert(
-        "Invalid Booking",
-        validation.reason || "This booking is not valid."
-      );
-      return;
-    }
-
-    setScannedData(parsedData);
-    onBookingVerified?.(parsedData);
   };
 
   const renderBookingDetails = () => {
-    if (!scannedData) return null;
+    if (isLoading) {
+      return (
+        <View className="bg-white p-4 rounded-lg border border-gray-200 mt-4">
+          <View className="items-center py-4">
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="text-gray-600 mt-2">
+              Loading booking details...
+            </Text>
+          </View>
+        </View>
+      );
+    }
 
-    const formatted = formatBookingForDisplay(scannedData);
+    if (!scannedBooking) return null;
+
+    const formatted = formatBookingForDisplay(scannedBooking);
 
     return (
       <View className="bg-white p-4 rounded-lg border border-gray-200 mt-4">
@@ -92,7 +128,7 @@ export const EmployeeQRScanner = ({
           <View className="flex-row justify-between">
             <Text className="text-gray-600">Showtime ID:</Text>
             <Text className="font-semibold text-gray-900">
-              {scannedData.showtimeId}
+              {scannedBooking.showtimeId}
             </Text>
           </View>
         </View>
@@ -104,7 +140,7 @@ export const EmployeeQRScanner = ({
               "Booking Verified",
               "Customer can proceed to their seats."
             );
-            setScannedData(null);
+            setScannedBooking(null);
           }}
         >
           <Text className="text-white text-center font-semibold">
@@ -134,13 +170,9 @@ export const EmployeeQRScanner = ({
           setTimeout(() => {
             setIsScanning(false);
             // Example QR data (this would come from the camera)
+            // Format: only bookingId
             const mockQRData = JSON.stringify({
               bookingId: "booking-001",
-              userId: "user-123",
-              showtimeId: "showtime-001",
-              totalPrice: 25.5,
-              seats: ["seat-a1", "seat-a2"],
-              createdAt: new Date().toISOString(),
             });
             simulateQRScan(mockQRData);
           }, 2000);
