@@ -46,7 +46,11 @@ interface SelectedFoodDrink {
 }
 
 export default function ShowtimeSelectionScreen() {
-  const { id: movieId } = useLocalSearchParams<{ id: string }>();
+  const { id: movieId, showtimeId: preSelectedShowtimeId } =
+    useLocalSearchParams<{
+      id: string;
+      showtimeId?: string;
+    }>();
   const router = useRouter();
   const { showToast } = useToast();
   const { isDark } = useTheme();
@@ -87,6 +91,7 @@ export default function ShowtimeSelectionScreen() {
   const timerStartTimeRef = useRef<number | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const previousShowtimeIdRef = useRef<string | null>(null);
+  const hasAutoSelectedRef = useRef<boolean>(false);
 
   // Generate date options
   const dateOptions = useMemo<DateOption[]>(() => {
@@ -344,6 +349,43 @@ export default function ShowtimeSelectionScreen() {
     loadInitialData();
     loadFoodDrinks();
   }, []);
+
+  useEffect(() => {
+    if (
+      preSelectedShowtimeId &&
+      showtimes.length > 0 &&
+      !selectedShowtime &&
+      !hasAutoSelectedRef.current
+    ) {
+      const showtimeToSelect = showtimes.find(
+        (st) => st.id === preSelectedShowtimeId
+      );
+      if (showtimeToSelect) {
+        // Set the date first if needed
+        const showtimeDate = new Date(showtimeToSelect.startTime);
+        const formatLocalDate = (date: Date): string => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        };
+        const showtimeDateStr = formatLocalDate(showtimeDate);
+        const dateOption = dateOptions.find(
+          (opt) => opt.fullDate === showtimeDateStr
+        );
+        if (dateOption && dateOption.fullDate !== selectedDate?.fullDate) {
+          setSelectedDate(dateOption);
+        }
+        hasAutoSelectedRef.current = true;
+        handleShowtimeSelect(showtimeToSelect);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preSelectedShowtimeId, showtimes, selectedShowtime, dateOptions]);
+
+  useEffect(() => {
+    hasAutoSelectedRef.current = false;
+  }, [preSelectedShowtimeId]);
 
   const handleDateSelect = (date: DateOption) => {
     setSelectedDate(date);
