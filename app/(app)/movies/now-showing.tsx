@@ -50,7 +50,7 @@ export default function NowShowingScreen() {
         setHasNextPage(false);
       }
     } catch (error) {
-      console.error("Lỗi tải phim đang chiếu:", error);
+      console.log("Lỗi tải phim đang chiếu:", error);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);

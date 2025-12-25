@@ -42,7 +42,7 @@ class GenreService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách thể loại.");
-      console.error("Get genres error:", e);
+      console.log("Get genres error:", e);
       throw new Error(msg);
     }
   }
@@ -60,7 +60,7 @@ class GenreService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể tạo thể loại.");
-      console.error("Create genre error:", e);
+      console.log("Create genre error:", e);
       throw new Error(msg);
     }
   }
@@ -78,7 +78,7 @@ class GenreService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể cập nhật thể loại.");
-      console.error("Update genre error:", e);
+      console.log("Update genre error:", e);
       throw new Error(msg);
     }
   }
@@ -90,7 +90,7 @@ class GenreService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể xóa (archive) thể loại.");
-      console.error("Archive genre error:", e);
+      console.log("Archive genre error:", e);
       throw new Error(msg);
     }
   }
@@ -102,7 +102,7 @@ class GenreService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể khôi phục thể loại.");
-      console.error("Restore genre error:", e);
+      console.log("Restore genre error:", e);
       throw new Error(msg);
     }
   }

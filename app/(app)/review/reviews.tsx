@@ -71,7 +71,7 @@ export default function ReviewListScreen() {
               (listRes.pagination?.totalPages ?? 1)
           );
         } catch (e) {
-          console.error("load review-list error:", e);
+          console.log("load review-list error:", e);
           if (!cancelled) setError("Không tải được danh sách đánh giá.");
         } finally {
           if (!cancelled) setLoading(false);
@@ -103,7 +103,7 @@ export default function ReviewListScreen() {
           (res.pagination?.totalPages ?? nextPage)
       );
     } catch (e) {
-      console.error("loadMore reviews error:", e);
+      console.log("loadMore reviews error:", e);
     } finally {
       setLoadingMore(false);
     }

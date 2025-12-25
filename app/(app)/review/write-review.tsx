@@ -72,7 +72,7 @@ export default function WriteReviewScreen() {
       showToast("Cảm ơn bạn đã gửi đánh giá!", "success");
       router.back();
     } catch (e: any) {
-      console.error("createReview error:", e);
+      console.log("createReview error:", e);
       showToast(e?.message || "Không gửi được đánh giá, thử lại sau.", "error");
     } finally {
       setSubmitting(false);

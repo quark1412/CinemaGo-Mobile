@@ -109,7 +109,7 @@ export default function Account() {
           className="w-24 h-24 rounded-full"
         />
         <Text className="text-lg font-[semibold] text-center text-foreground">
-          {user?.fullname || "User"}
+          {user?.fullname || "Người dùng"}
         </Text>
       </View>
 
@@ -125,7 +125,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              Sửa thông tin
+              Chỉnh sửa hồ sơ
             </Text>
           </TouchableOpacity>
 
@@ -179,14 +179,15 @@ export default function Account() {
         </View>
 
         <TouchableOpacity
-          className={`flex-row items-center p-4 ${isDark
-            ? "bg-red-900/20 border-red-800/50"
-            : "bg-red-50 border-red-200"
-            } rounded-xl border mt-auto`}
+          className={`flex-row items-center p-4 ${
+            isDark
+              ? "bg-red-900/20 border-red-800/50"
+              : "bg-red-50 border-red-200"
+          } rounded-xl border mt-auto`}
           onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
-          <Text className="ml-3 font-[semibold] text-red-500">Sign Out</Text>
+          <Text className="ml-3 font-[semibold] text-red-500">Đăng xuất</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -62,7 +62,7 @@ export default function Cinemas() {
         let location = await Location.getCurrentPositionAsync({});
         setUserLocation(location.coords);
       } catch (error) {
-        console.error("Error fetching location:", error);
+        console.log("Error fetching location:", error);
         setCity("TP.Hồ Chí Minh");
       }
     })();
@@ -116,7 +116,7 @@ export default function Cinemas() {
         }
       } catch (error) {
         if (!isCancelled) {
-          console.error("Lỗi tải Cinema:", error);
+          console.log("Lỗi tải Cinema:", error);
           showToast("Không tải được danh sách rạp", "error");
           setData([]);
         }
@@ -136,7 +136,12 @@ export default function Cinemas() {
 
   const cities = useMemo(() => {
     const unique = Array.from(new Set(data.map((d) => d.city)));
-    return [NEAR_ME, ...(unique.length > 0 ? unique : FALLBACK_CITIES.filter(c => c !== NEAR_ME))];
+    return [
+      NEAR_ME,
+      ...(unique.length > 0
+        ? unique
+        : FALLBACK_CITIES.filter((c) => c !== NEAR_ME)),
+    ];
   }, [data]);
 
   const results = useMemo(() => {
@@ -144,7 +149,7 @@ export default function Cinemas() {
 
     const normalize = (s: string) => s.trim().toLowerCase();
 
-    // 1. Filter by Query first 
+    // 1. Filter by Query first
     let filtered = data.filter((c) => {
       return (
         q.length === 0 ||
@@ -156,8 +161,7 @@ export default function Cinemas() {
     // 2. Filter by City or "Near Me" logic
     if (city === NEAR_ME) {
       if (userLocation) {
-        const withDistance = filtered.map(c => {
-
+        const withDistance = filtered.map((c) => {
           const distance = calculateDistance(
             userLocation.latitude,
             userLocation.longitude,
@@ -174,11 +178,10 @@ export default function Cinemas() {
 
         return nearby.slice(0, 5);
       } else {
-
         return filtered;
       }
     } else {
-      return filtered.filter(c => normalize(c.city) === normalize(city));
+      return filtered.filter((c) => normalize(c.city) === normalize(city));
     }
   }, [data, city, query, userLocation]);
 
@@ -293,7 +296,10 @@ export default function Cinemas() {
                     )}
                   </View>
 
-                  <Text className="text-sm text-gray-500 mt-0.5" numberOfLines={2}>
+                  <Text
+                    className="text-sm text-gray-500 mt-0.5"
+                    numberOfLines={2}
+                  >
                     {item.address ? `${item.address}  ` : ""}
                   </Text>
                 </View>
@@ -334,8 +340,9 @@ export default function Cinemas() {
                       setCity(c);
                       setShowCityPicker(false);
                     }}
-                    className={`p-3 rounded-lg mb-2 ${c === city ? "bg-pink-100" : "bg-gray-100"
-                      }`}
+                    className={`p-3 rounded-lg mb-2 ${
+                      c === city ? "bg-pink-100" : "bg-gray-100"
+                    }`}
                   >
                     <Text className="text-center text-base">{c}</Text>
                   </Pressable>

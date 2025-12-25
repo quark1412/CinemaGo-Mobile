@@ -27,10 +27,10 @@ export const parseBookingQRData = (
       };
     }
 
-    console.error("Invalid QR data structure - missing bookingId");
+    console.log("Invalid QR data structure - missing bookingId");
     return null;
   } catch (error) {
-    console.error("Failed to parse QR code data:", error);
+    console.log("Failed to parse QR code data:", error);
     return null;
   }
 };

@@ -5,7 +5,7 @@ import { jwtDecode } from "jwt-decode";
 
 // const baseURL =
 //   process.env.EXPO_PUBLIC_BASE_URL || "http://192.168.16.59:8000/v1";
-const baseURL = "http://192.168.1.9:8000/v1";
+const baseURL = "http://192.168.1.6:8000/v1";
 
 console.log(process.env.EXPO_PUBLIC_BASE_URL);
 
@@ -91,15 +91,18 @@ instance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      console.error(
+      // Server responded with error
+      console.log(
         "API Error:",
         error.response.status,
         error.response.data?.message || error.message
       );
     } else if (error.request) {
-      console.error("Network Error: No response received", error.message);
+      // Request made but no response
+      console.log("Network Error: No response received", error.message);
     } else {
-      console.error("Request Error:", error.message);
+      // Something else happened
+      console.log("Request Error:", error.message);
     }
     return Promise.reject(error);
   }

@@ -64,7 +64,7 @@ export default function MovieDetail() {
 
         if (!cancelled) setMovie(data);
       } catch (e) {
-        console.error("getMovieById error:", e);
+        console.log("getMovieById error:", e);
         if (!cancelled) {
           setError("Không tải được thông tin phim.");
           setMovie(null);
@@ -103,7 +103,7 @@ export default function MovieDetail() {
 
           setReviews(reviewsRes.data ?? []);
         } catch (e) {
-          console.error("getReviews error:", e);
+          console.log("getReviews error:", e);
           if (!cancelled) {
             setReviewOverview(null);
             setReviews([]);
@@ -167,7 +167,7 @@ export default function MovieDetail() {
   //         // setCheckingBooking(false);
   //       }
   //     } catch (e) {
-  //       console.error("getMyBooking error:", e);
+  //       console.log("getMyBooking error:", e);
   //       if (!cancelled) {
   //         setCanWriteReview(false);
   //         // setCheckingBooking(false);

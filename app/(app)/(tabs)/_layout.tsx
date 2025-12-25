@@ -19,7 +19,7 @@ export default function RootLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          marginBottom: 20,
+          marginBottom: 0,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           backgroundColor: colors.background,
@@ -31,7 +31,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "Home",
+          title: "Trang chủ",
           tabBarIcon: ({ color, focused }) => {
             return focused ? (
               <Ionicons name="home" size={20} color={colors.activeColor} />
@@ -50,7 +50,7 @@ export default function RootLayout() {
                 color: focused ? colors.activeColor : colors.inactiveColor,
               }}
             >
-              Home
+              Trang chủ
             </Text>
           ),
 
@@ -61,7 +61,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="cinemas"
         options={{
-          title: "Cinemas",
+          title: "Rạp chiếu",
           tabBarIcon: ({ color, focused }) => {
             return focused ? (
               <MaterialCommunityIcons
@@ -84,7 +84,7 @@ export default function RootLayout() {
                 color: focused ? colors.activeColor : colors.inactiveColor,
               }}
             >
-              Cinemas
+              Rạp chiếu
             </Text>
           ),
 
@@ -95,7 +95,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: "Profile",
+          title: "Tài khoản",
           tabBarIcon: ({ color, focused }) => {
             return focused ? (
               <MaterialCommunityIcons
@@ -118,7 +118,7 @@ export default function RootLayout() {
                 color: focused ? colors.activeColor : colors.inactiveColor,
               }}
             >
-              Account
+              Tài khoản
             </Text>
           ),
 

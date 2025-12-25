@@ -57,7 +57,7 @@ export const EmployeeQRScanner = ({
       setScannedBooking(booking);
       onBookingVerified?.(booking);
     } catch (error: any) {
-      console.error("Error fetching booking:", error);
+      console.log("Error fetching booking:", error);
       Alert.alert(
         "Error",
         error.response?.data?.message || "Failed to fetch booking information."

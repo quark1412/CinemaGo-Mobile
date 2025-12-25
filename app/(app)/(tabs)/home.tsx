@@ -104,7 +104,7 @@ export default function Home() {
           setFeaturedMovies(finalFeatured);
           setNowShowingMovies(finalNowShowing);
         } catch (e) {
-          console.error("Lỗi tải dữ liệu Home:", e);
+          console.log("Lỗi tải dữ liệu Home:", e);
         } finally {
           if (!isCancelled) setIsLoading(false);
         }

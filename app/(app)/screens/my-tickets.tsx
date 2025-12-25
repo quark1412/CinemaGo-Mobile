@@ -120,6 +120,17 @@ export default function MyTickets() {
       }
       groups[date].push(booking);
     });
+
+    Object.keys(groups).forEach((date) => {
+      groups[date].sort((a, b) => {
+        const dateA =
+          a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const dateB =
+          b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+    });
+
     return groups;
   }, [bookings]);
 
@@ -265,7 +276,7 @@ export default function MyTickets() {
                   }`}
                 >
                   <Text
-                    className={`text-sm font-semibold ${
+                    className={`text-sm font-[semibold] ${
                       isSelected
                         ? "text-white"
                         : isDark

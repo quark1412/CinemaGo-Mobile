@@ -31,7 +31,7 @@ export function useCinemaShowtimes(cinemaId?: string) {
         const c: Cinema = await cinemaService.getCinemaById(cinemaId);
         if (!cancelled) setCinema(c);
       } catch (err) {
-        console.error("Lỗi getCinemaById:", err);
+        console.log("Lỗi getCinemaById:", err);
       } finally {
         if (!cancelled) setLoadingCinema(false);
       }
@@ -139,7 +139,7 @@ export function useCinemaShowtimes(cinemaId?: string) {
 
             return { ...movie, labels };
           } catch (err) {
-            console.error(`Lỗi getMovieById (${movieId}):`, err);
+            console.log(`Lỗi getMovieById (${movieId}):`, err);
             return null;
           }
         });
@@ -150,7 +150,7 @@ export function useCinemaShowtimes(cinemaId?: string) {
 
         if (!cancelled) setMovies(moviesWithShowtimes);
       } catch (err) {
-        console.error("Lỗi fetch showtimes + movies:", err);
+        console.log("Lỗi fetch showtimes + movies:", err);
         if (!cancelled) setMovies([]);
       } finally {
         if (!cancelled) setLoadingMovies(false);
