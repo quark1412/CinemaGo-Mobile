@@ -1,6 +1,6 @@
 import TrailerModal from "@/components/trailer-modal";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
 import { useVideoPlayer } from "expo-video";
 import { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ import { useCinemaShowtimes } from "@/hook/useCinemaShowtimes";
 
 export default function Showtimes() {
   const { isDark } = useTheme();
-  const navigation = useNavigation<any>();
+  const router = useRouter();
   const { id, cinemaName } = useLocalSearchParams<{
     id: string;
     cinemaName?: string;
@@ -90,8 +90,13 @@ export default function Showtimes() {
   };
 
   const handlePressShowtime = (st: any, movie: MovieWithLabels) => {
-    // navigation.navigate("Booking", { showtimeId: st.id, movieId: movie.id, cinemaId });
-    console.log("Chọn suất chiếu:", st.id, "phim:", movie.title);
+    router.push({
+      pathname: "/movies/[id]/showtime-selection",
+      params: {
+        id: movie.id,
+        showtimeId: st.id,
+      },
+    });
   };
 
   const textColor = isDark ? "text-white" : "text-slate-900";
@@ -104,7 +109,7 @@ export default function Showtimes() {
       <View className={`px-3 pt-1 pb-3  ${isDark ? "#070f20" : "#fde2e8"} `}>
         <View className="flex-row items-center ">
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
             className={`w-9 h-9 rounded-full  ${isDark ? "dark" : "light"} bg-background items-center justify-center`}
           >
             <Ionicons name="chevron-back" size={20} color={iconColor} />
