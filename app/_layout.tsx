@@ -1,24 +1,30 @@
-import { Stack } from "expo-router";
-import { useFonts } from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState } from "react";
-import { Slot } from "expo-router";
-
-import "../global.css";
-import { StatusBar } from "react-native";
+import { ThemeProvider } from "@/contexts/themeContext";
 import { ToastProvider } from "@/contexts/toastContext";
+import { UserProvider } from "@/contexts/userContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFonts } from "expo-font";
+import { Slot } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { StatusBar } from "react-native";
+import "../global.css";
+
+import {
+  disableBiometricLogin,
+  isBiometricEnabled,
+} from "@/services/users/biometric";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    regular: require("../assets/fonts/Urbanist-Regular.ttf"),
-    medium: require("../assets/fonts/Urbanist-Medium.ttf"),
-    semibold: require("../assets/fonts/Urbanist-SemiBold.ttf"),
-    light: require("../assets/fonts/Urbanist-Light.ttf"),
-    bold: require("../assets/fonts/Urbanist-Bold.ttf"),
-    black: require("../assets/fonts/Urbanist-Black.ttf"),
-    extraBold: require("../assets/fonts/Urbanist-ExtraBold.ttf"),
+    regular: require("../assets/fonts/Manrope-Regular.ttf"),
+    medium: require("../assets/fonts/Manrope-Medium.ttf"),
+    semibold: require("../assets/fonts/Manrope-SemiBold.ttf"),
+    light: require("../assets/fonts/Manrope-Light.ttf"),
+    extraLight: require("../assets/fonts/Manrope-ExtraLight.ttf"),
+    bold: require("../assets/fonts/Manrope-Bold.ttf"),
+    extraBold: require("../assets/fonts/Manrope-ExtraBold.ttf"),
   });
 
   useEffect(() => {
@@ -27,16 +33,37 @@ export default function RootLayout() {
     }
   }, [loaded, error]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const enabled = await isBiometricEnabled();
+        if (!enabled) return;
+
+        const currentRefreshToken = await AsyncStorage.getItem("refreshToken");
+
+        if (!currentRefreshToken) {
+          await disableBiometricLogin();
+        }
+      } catch (e) {
+        console.log("Biometric init sync error:", e);
+      }
+    })();
+  }, []);
+
   if (!loaded && !error) {
     return null;
   }
 
   return (
     // <SessionProvider>
-    <ToastProvider>
-      <StatusBar barStyle={"dark-content"} />
-      <Slot />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <UserProvider>
+          <StatusBar />
+          <Slot />
+        </UserProvider>
+      </ToastProvider>
+    </ThemeProvider>
     // </SessionProvider>
   );
 }

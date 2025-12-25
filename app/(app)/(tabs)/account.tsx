@@ -1,10 +1,195 @@
-import { Text } from "react-native";
+// app/(app)/(tabs)/account.tsx (ví dụ)
+import { useTheme } from "@/contexts/themeContext";
+import { useToast } from "@/contexts/toastContext";
+import { useUser } from "@/contexts/userContext";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Image, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  canUseBiometric,
+  disableBiometricLogin,
+  enableBiometricLogin,
+  isBiometricEnabled,
+} from "@/services/users/biometric";
+
 export default function Account() {
+  const { showToast } = useToast();
+  const { toggleTheme, isDark } = useTheme();
+  const { user, logout } = useUser();
+
+  const [bioSupported, setBioSupported] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [checkingBio, setCheckingBio] = useState(true);
+
+  useEffect(() => {
+    console.log(user);
+  }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) return;
+      try {
+        setCheckingBio(true);
+        const supported = await canUseBiometric();
+        setBioSupported(supported);
+        setBioEnabled(await isBiometricEnabled(user.id));
+      } finally {
+        setCheckingBio(false);
+      }
+    })();
+  }, [user?.id]);
+
+  const onToggleBiometric = async () => {
+    if (!user?.id) {
+      showToast("Vui lòng đăng nhập lại để thực hiện.");
+      return;
+    }
+    try {
+      if (bioEnabled) {
+        await disableBiometricLogin(user.id);
+        setBioEnabled(false);
+        showToast("Đã tắt đăng nhập sinh trắc học");
+        return;
+      }
+
+      if (!bioSupported) {
+        showToast("Thiết bị chưa sẵn sàng cho Face/Touch ID");
+        return;
+      }
+      const currentRefreshToken =
+        (await AsyncStorage.getItem("refreshToken")) || "";
+      if (!currentRefreshToken) {
+        showToast("Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.");
+        return;
+      }
+
+      const ok = await enableBiometricLogin(user.id, currentRefreshToken);
+      setBioEnabled(!!ok);
+      showToast(ok ? "Đã bật đăng nhập sinh trắc học" : "Không thể bật");
+    } catch {
+      showToast("Có lỗi xảy ra. Thử lại sau.");
+    }
+  };
+
+  const handleSignOut = async () => {
+    logout();
+  };
+
   return (
-    <SafeAreaView>
-      <Text>Account</Text>
+    <SafeAreaView
+      className={`flex-1 ${isDark ? "dark" : "light"} bg-background`}
+    >
+      <View className="flex-row items-center justify-between p-4">
+        <Text className="text-2xl text-center font-[bold] text-foreground">
+          Tài khoản
+        </Text>
+        <TouchableOpacity
+          onPress={toggleTheme}
+          className="p-2 bg-card-background rounded-lg"
+        >
+          <Ionicons
+            name={isDark ? "sunny" : "moon"}
+            size={24}
+            color={isDark ? "#fff" : "#1f2937"}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View className="items-center gap-2 p-4">
+        <Image
+          source={{
+            uri:
+              user?.avatarUrl ||
+              "https://ui-avatars.com/api/?background=111827&color=fff&name=CinemaGo",
+          }}
+          className="w-24 h-24 rounded-full"
+        />
+        <Text className="text-lg font-[semibold] text-center text-foreground">
+          {user?.fullname || "Người dùng"}
+        </Text>
+      </View>
+
+      <View className="flex-1 p-4">
+        <View className="gap-2">
+          <TouchableOpacity
+            className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
+            onPress={() => router.push("/screens/edit-profile")}
+          >
+            <Ionicons
+              name="person-outline"
+              size={24}
+              color={isDark ? "#fff" : "#1f2937"}
+            />
+            <Text className="ml-3 font-[semibold] text-foreground">
+              Chỉnh sửa hồ sơ
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
+            onPress={() => router.push("/screens/change-password")}
+          >
+            <Ionicons
+              name="lock-closed-outline"
+              size={24}
+              color={isDark ? "#fff" : "#1f2937"}
+            />
+            <Text className="ml-3 font-[semibold] text-foreground">
+              Đổi mật khẩu
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="flex-row items-center p-4 bg-card-background rounded-xl border border-border"
+            onPress={() => router.push("/screens/my-tickets")}
+          >
+            <Ionicons
+              name="list-outline"
+              size={24}
+              color={isDark ? "#fff" : "#1f2937"}
+            />
+            <Text className="ml-3 font-[semibold] text-foreground">
+              Vé của tôi
+            </Text>
+          </TouchableOpacity>
+
+          <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
+            <View className="flex-row items-center">
+              <Ionicons
+                name="finger-print-outline"
+                size={24}
+                color={isDark ? "#fff" : "#1f2937"}
+              />
+              <View className="ml-3">
+                <Text className="font-[semibold] text-foreground">
+                  Đăng nhập sinh trắc học
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={bioEnabled}
+              onValueChange={onToggleBiometric}
+              disabled={checkingBio}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          className={`flex-row items-center p-4 ${
+            isDark
+              ? "bg-red-900/20 border-red-800/50"
+              : "bg-red-50 border-red-200"
+          } rounded-xl border mt-auto`}
+          onPress={handleSignOut}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+          <Text className="ml-3 font-[semibold] text-red-500">Đăng xuất</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
