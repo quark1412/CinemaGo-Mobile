@@ -6,7 +6,18 @@
 
 ## 🚀 Hướng dẫn Cài đặt & Chạy dự án (Quick Start)
 
-Để chạy dự án này, máy tính cần có sẵn **Node.js** (v20+) và **Git**.
+Nếu bạn đã là lập trình viên (đã có Node.js), hãy bỏ qua bước này và xuống phần 2. Nếu chưa, hãy làm theo từng bước:
+
+###Cài đặt Node.js (Bắt buộc)
+Ứng dụng chạy trên nền tảng JavaScript, cần Node.js phiên bản ổn định (LTS).
+1.  Truy cập: [https://nodejs.org/](https://nodejs.org/)
+2.  Tải phiên bản **LTS** (Recommended for Most Users) - *Khuyên dùng v20.x hoặc v22.x*.
+3.  Cài đặt: Nhấn Next liên tục (Mặc định).
+4.  Kiểm tra: Mở **Command Prompt (CMD)** hoặc Terminal và gõ:
+    ```bash
+    node -v
+    # Kết quả hiện ra vd: v20.11.0 là thành công
+    ```
 
 ### 1. Cài đặt môi trường (Setup)
 
