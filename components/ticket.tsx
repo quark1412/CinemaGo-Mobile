@@ -178,7 +178,7 @@ export const Ticket = ({ booking }: TicketProps) => {
           }
         }
       } catch (error) {
-        console.error("Error fetching ticket data:", error);
+        console.log("Error fetching ticket data:", error);
       } finally {
         setLoading(false);
       }
@@ -390,7 +390,7 @@ export const Ticket = ({ booking }: TicketProps) => {
         <View className="p-6 space-y-4">
           {/* Movie Title */}
           <View className="items-center">
-            <Text className={`${textColor} text-xl font-bold`}>
+            <Text className={`${textColor} text-xl font-[bold]`}>
               {showtimeData?.movieTitle || "Đang tải..."}
             </Text>
           </View>
@@ -428,25 +428,25 @@ export const Ticket = ({ booking }: TicketProps) => {
             <View className="space-y-1">
               <View className="flex-row justify-between">
                 <Text className={`${textMuted} text-sm`}>Mã vé</Text>
-                <Text className={`${textColor} text-sm font-medium`}>
+                <Text className={`${textColor} text-sm font-[medium]`}>
                   {booking.id}
                 </Text>
               </View>
               <View className="flex-row justify-between">
                 <Text className={`${textMuted} text-sm`}>Ghế</Text>
-                <Text className={`${textColor} text-sm font-medium`}>
+                <Text className={`${textColor} text-sm font-[medium]`}>
                   {formatSeatNumbers()}
                 </Text>
               </View>
               <View className="flex-row justify-between">
                 <Text className={`${textMuted} text-sm`}>Suất chiếu</Text>
-                <Text className={`${textColor} text-sm font-medium`}>
+                <Text className={`${textColor} text-sm font-[medium]`}>
                   {showtimeData?.startTime || "N/A"}
                 </Text>
               </View>
               <View className="flex-row justify-between">
                 <Text className={`${textMuted} text-sm`}>Phòng chiếu</Text>
-                <Text className={`${textColor} text-sm font-medium`}>
+                <Text className={`${textColor} text-sm font-[medium]`}>
                   {showtimeData?.roomName || "N/A"}
                 </Text>
               </View>
@@ -505,7 +505,7 @@ export const Ticket = ({ booking }: TicketProps) => {
                     <Text className={`${textMuted} text-sm`}>
                       {seatCount} Ghế ({getSeatTypeName(type)})
                     </Text>
-                    <Text className={`${textColor} text-sm font-medium`}>
+                    <Text className={`${textColor} text-sm font-[medium]`}>
                       {formatPrice(totalPrice)}
                     </Text>
                   </View>
@@ -519,7 +519,7 @@ export const Ticket = ({ booking }: TicketProps) => {
                     <Text className={`${textMuted} text-sm`}>
                       {fd.quantity} {fd.name}
                     </Text>
-                    <Text className={`${textColor} text-sm font-medium`}>
+                    <Text className={`${textColor} text-sm font-[medium]`}>
                       {formatPrice(fd.price)}
                     </Text>
                   </View>
@@ -527,7 +527,7 @@ export const Ticket = ({ booking }: TicketProps) => {
 
               {/* Total */}
               <View className={`border-t ${borderColor} pt-1 mt-2`}>
-                <View className="flex-row justify-between font-bold">
+                <View className="flex-row justify-between font-[bold]">
                   <Text className={`${textColor} text-sm`}>Tổng</Text>
                   <Text className={`${textColor} text-sm`}>
                     {formatPrice(booking.totalPrice)}

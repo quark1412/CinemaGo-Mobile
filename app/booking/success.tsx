@@ -189,8 +189,8 @@ export default function BookingSuccessScreen() {
       emailSentRef.current.add(booking.id);
       showToast("Email xác nhận đặt vé đã được gửi thành công", "success");
     } catch (error: any) {
-      console.error("Failed to send booking email:", error);
-      console.error("Error details:", {
+      console.log("Failed to send booking email:", error);
+      console.log("Error details:", {
         message: error?.message,
         response: error?.response?.data,
         stack: error?.stack,
@@ -326,7 +326,7 @@ export default function BookingSuccessScreen() {
           return;
         }
       } catch (error: any) {
-        console.error("Error while checking payment status:", error);
+        console.log("Error while checking payment status:", error);
         showToast(
           error?.message || "Không thể kiểm tra trạng thái thanh toán",
           "error"
@@ -368,7 +368,7 @@ export default function BookingSuccessScreen() {
       <View className={`w-full max-w-md rounded-2xl p-6 ${cardBg}`}>
         <View className="items-center mb-4">{renderIcon()}</View>
 
-        <Text className={`text-xl font-bold text-center mb-2 ${textColor}`}>
+        <Text className={`text-xl font-[bold] text-center mb-2 ${textColor}`}>
           {status === "pending"
             ? "Đang xử lý thanh toán..."
             : status === "success"
@@ -382,7 +382,7 @@ export default function BookingSuccessScreen() {
           <View className="mt-2 mb-4 rounded-xl bg-slate-800/5 dark:bg-slate-800/40 px-4 py-3">
             {bookingId && (
               <View className="flex-row justify-between mb-1">
-                <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <Text className="text-xs font-[medium] text-slate-500 dark:text-slate-400">
                   Mã đặt vé
                 </Text>
                 <Text className="text-xs font-mono text-slate-700 dark:text-slate-200">
@@ -392,10 +392,10 @@ export default function BookingSuccessScreen() {
             )}
             {amount != null && (
               <View className="flex-row justify-between mt-1">
-                <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <Text className="text-xs font-[medium] text-slate-500 dark:text-slate-400">
                   Số tiền
                 </Text>
-                <Text className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                <Text className="text-xs font-[semibold] text-slate-900 dark:text-slate-100">
                   {new Intl.NumberFormat("vi-VN", {
                     style: "currency",
                     currency: "VND",
@@ -411,13 +411,13 @@ export default function BookingSuccessScreen() {
             className="flex-1 py-3 rounded-xl border border-slate-300 dark:border-slate-600 items-center"
             onPress={handleGoHome}
           >
-            <Text className={`${textColor} font-semibold`}>Về trang chủ</Text>
+            <Text className={`${textColor} font-[semibold]`}>Về trang chủ</Text>
           </TouchableOpacity>
           <TouchableOpacity
             className="flex-1 py-3 rounded-xl bg-red-600 items-center"
             onPress={handleViewTickets}
           >
-            <Text className="text-white font-semibold">Xem vé của tôi</Text>
+            <Text className="text-white font-[semibold]">Xem vé của tôi</Text>
           </TouchableOpacity>
         </View>
       </View>

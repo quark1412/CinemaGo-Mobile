@@ -72,7 +72,7 @@ export default function SearchScreen() {
         }
       } catch (error) {
         if (!isCancelled) {
-          console.error("Lỗi tải Genre:", error);
+          console.log("Lỗi tải Genre:", error);
           setGenreOptions([]);
         }
       }
@@ -127,7 +127,7 @@ export default function SearchScreen() {
             setMovies(allMovies);
           }
         } catch (error) {
-          console.error("Lỗi tìm kiếm phim:", error);
+          console.log("Lỗi tìm kiếm phim:", error);
           if (!isCancelled) setMovies([]);
         } finally {
           if (!isCancelled) setIsLoading(false);

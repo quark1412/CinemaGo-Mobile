@@ -47,7 +47,7 @@ class ShowTimeService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách suất chiếu.");
-      console.error("Get ShowTimes error:", e);
+      console.log("Get ShowTimes error:", e);
       throw new Error(msg);
     }
   }
@@ -64,7 +64,7 @@ class ShowTimeService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy suất chiếu theo phim.");
-      console.error("Get ShowTimes by movie error:", e);
+      console.log("Get ShowTimes by movie error:", e);
       throw new Error(msg);
     }
   }
@@ -77,7 +77,7 @@ class ShowTimeService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy thông tin suất chiếu.");
-      console.error("Get ShowTime detail error:", e);
+      console.log("Get ShowTime detail error:", e);
       throw new Error(msg);
     }
   }
@@ -105,7 +105,7 @@ class ShowTimeService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể tạo suất chiếu.");
-      console.error("Create ShowTime error:", e);
+      console.log("Create ShowTime error:", e);
       throw new Error(msg);
     }
   }
@@ -137,7 +137,7 @@ class ShowTimeService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể cập nhật suất chiếu.");
-      console.error("Update ShowTime error:", e);
+      console.log("Update ShowTime error:", e);
       throw new Error(msg);
     }
   }
@@ -150,7 +150,7 @@ class ShowTimeService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể xóa (archive) suất chiếu.");
-      console.error("Archive ShowTime error:", e);
+      console.log("Archive ShowTime error:", e);
       throw new Error(msg);
     }
   }
@@ -163,7 +163,7 @@ class ShowTimeService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể khôi phục suất chiếu.");
-      console.error("Restore ShowTime error:", e);
+      console.log("Restore ShowTime error:", e);
       throw new Error(msg);
     }
   }
@@ -187,7 +187,7 @@ class ShowTimeService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách phòng bận.");
-      console.error("Get busy room ids error:", e);
+      console.log("Get busy room ids error:", e);
       throw new Error(msg);
     }
   }

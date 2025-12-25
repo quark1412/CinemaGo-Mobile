@@ -33,17 +33,15 @@ export default function ChangePassword() {
     const errors: string[] = [];
 
     if (password.length < 8) {
-      errors.push("Password must be at least 8 characters long");
+      errors.push("Mật khẩu phải có ít nhất 8 ký tự");
     }
 
     if (!/(?=.*[0-9])/.test(password)) {
-      errors.push("Password must contain at least one number");
+      errors.push("Mật khẩu phải chứa ít nhất một số");
     }
 
     if (!/(?=.*[!@#$%^&*])/.test(password)) {
-      errors.push(
-        "Password must contain at least one special character (!@#$%^&*)"
-      );
+      errors.push("Mật khẩu phải chứa ít nhất một ký tự đặc biệt (!@#$%^&*)");
     }
 
     return errors;
@@ -53,11 +51,11 @@ export default function ChangePassword() {
     const newErrors: { [key: string]: string } = {};
 
     if (!formData.oldPassword.trim()) {
-      newErrors.oldPassword = "Current password is required";
+      newErrors.oldPassword = "Yêu cầu nhập mật khẩu hiện tại";
     }
 
     if (!formData.newPassword.trim()) {
-      newErrors.newPassword = "New password is required";
+      newErrors.newPassword = "Yêu cầu nhập mật khẩu mới";
     } else {
       const passwordErrors = validatePassword(formData.newPassword);
       if (passwordErrors.length > 0) {
@@ -66,9 +64,9 @@ export default function ChangePassword() {
     }
 
     if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = "Please confirm your password";
+      newErrors.confirmPassword = "Vui lòng xác nhận mật khẩu của bạn";
     } else if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords don't match";
+      newErrors.confirmPassword = "Mật khẩu không khớp";
     }
 
     setErrors(newErrors);
@@ -91,11 +89,11 @@ export default function ChangePassword() {
         newPassword: formData.newPassword.trim(),
       });
 
-      showToast("Password changed successfully!", "success");
+      showToast("Đổi mật khẩu thành công!", "success");
       router.back();
     } catch (error: any) {
       const errorMessage =
-        error?.response?.data?.message || "Failed to change password";
+        error?.response?.data?.message || "Không thể đổi mật khẩu";
       showToast(errorMessage, "error");
     } finally {
       setLoading(false);
@@ -124,7 +122,7 @@ export default function ChangePassword() {
           />
         </TouchableOpacity>
         <Text className="text-xl w-full text-center font-[bold] text-foreground">
-          Change Password
+          Đổi mật khẩu
         </Text>
       </View>
 
@@ -133,7 +131,7 @@ export default function ChangePassword() {
           {/* Current Password */}
           <View className="flex gap-2">
             <Text className="text-sm font-[medium] text-foreground">
-              Current Password
+              Mật khẩu hiện tại
             </Text>
             <View className="flex-row items-center flex">
               <TextInput
@@ -144,7 +142,7 @@ export default function ChangePassword() {
                     setErrors((prev) => ({ ...prev, oldPassword: "" }));
                   }
                 }}
-                placeholder="Enter your current password"
+                placeholder="Nhập mật khẩu hiện tại"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 secureTextEntry={!showPasswords.oldPassword}
                 className={`w-full px-4 py-4 pl-12 pr-12 bg-card-background border ${
@@ -197,7 +195,7 @@ export default function ChangePassword() {
           {/* New Password */}
           <View className="flex gap-2">
             <Text className="text-sm font-[medium] text-foreground">
-              New Password
+              Mật khẩu mới
             </Text>
             <View className="flex-row items-center flex">
               <TextInput
@@ -208,7 +206,7 @@ export default function ChangePassword() {
                     setErrors((prev) => ({ ...prev, newPassword: "" }));
                   }
                 }}
-                placeholder="Enter your new password"
+                placeholder="Nhập mật khẩu mới"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 secureTextEntry={!showPasswords.newPassword}
                 className={`w-full px-4 py-4 pl-12 pr-12 bg-card-background border ${
@@ -261,7 +259,7 @@ export default function ChangePassword() {
           {/* Confirm New Password */}
           <View className="flex gap-2">
             <Text className="text-sm font-[medium] text-foreground">
-              Confirm New Password
+              Xác nhận mật khẩu mới
             </Text>
             <View className="flex-row items-center flex">
               <TextInput
@@ -272,7 +270,7 @@ export default function ChangePassword() {
                     setErrors((prev) => ({ ...prev, confirmPassword: "" }));
                   }
                 }}
-                placeholder="Confirm your new password"
+                placeholder="Xác nhận mật khẩu mới của bạn"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 secureTextEntry={!showPasswords.confirmPassword}
                 className={`w-full px-4 py-4 pl-12 pr-12 bg-card-background border ${
@@ -325,17 +323,15 @@ export default function ChangePassword() {
           {/* Password Requirements */}
           <View className="bg-card-background p-4 rounded-xl border border-border">
             <Text className="text-sm font-[medium] text-foreground mb-2">
-              Password requirements:
+              Yêu cầu mật khẩu:
             </Text>
             <View className="flex gap-1">
+              <Text className="text-xs text-text-muted">• Ít nhất 8 ký tự</Text>
               <Text className="text-xs text-text-muted">
-                • At least 8 characters long
+                • Chứa ít nhất một số
               </Text>
               <Text className="text-xs text-text-muted">
-                • Contains at least one number
-              </Text>
-              <Text className="text-xs text-text-muted">
-                • Contains at least one special character (!@#$%^&*)
+                • Chứa ít nhất một ký tự đặc biệt (!@#$%^&*)
               </Text>
             </View>
           </View>
@@ -350,7 +346,7 @@ export default function ChangePassword() {
           }`}
         >
           <Text className="text-white text-center text-lg font-[semibold]">
-            {loading ? "Changing Password..." : "Change Password"}
+            {loading ? "Đang đổi mật khẩu..." : "Đổi mật khẩu"}
           </Text>
         </TouchableOpacity>
       </ScrollView>

@@ -80,7 +80,7 @@ export default function Account() {
     >
       <View className="flex-row items-center justify-between p-4">
         <Text className="text-2xl text-center font-[bold] text-foreground">
-          Account
+          Tài khoản
         </Text>
         <TouchableOpacity
           onPress={toggleTheme}
@@ -104,7 +104,7 @@ export default function Account() {
           className="w-24 h-24 rounded-full"
         />
         <Text className="text-lg font-[semibold] text-center text-foreground">
-          {user?.fullname || "User"}
+          {user?.fullname || "Người dùng"}
         </Text>
       </View>
 
@@ -120,7 +120,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              Edit Profile
+              Chỉnh sửa hồ sơ
             </Text>
           </TouchableOpacity>
 
@@ -134,7 +134,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              Change Password
+              Đổi mật khẩu
             </Text>
           </TouchableOpacity>
 
@@ -148,7 +148,7 @@ export default function Account() {
               color={isDark ? "#fff" : "#1f2937"}
             />
             <Text className="ml-3 font-[semibold] text-foreground">
-              My Tickets
+              Vé của tôi
             </Text>
           </TouchableOpacity>
 
@@ -184,7 +184,7 @@ export default function Account() {
           onPress={handleSignOut}
         >
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
-          <Text className="ml-3 font-[semibold] text-red-500">Sign Out</Text>
+          <Text className="ml-3 font-[semibold] text-red-500">Đăng xuất</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

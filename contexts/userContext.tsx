@@ -107,7 +107,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       await authService.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      console.log("Logout error:", error);
     } finally {
       await handleLogoutState();
       router.replace("/(app)/auth/sign-in");

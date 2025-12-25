@@ -39,10 +39,7 @@ export default function EditProfile() {
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (cameraStatus !== "granted" || galleryStatus !== "granted") {
-      showToast(
-        "Permissions are required to access camera and gallery",
-        "error"
-      );
+      showToast("Cần quyền truy cập camera và thư viện ảnh", "error");
       return false;
     }
     return true;
@@ -64,7 +61,7 @@ export default function EditProfile() {
         setAvatarUri(result.assets[0].uri);
       }
     } catch (error) {
-      showToast("Failed to load photo", "error");
+      showToast("Không thể tải ảnh", "error");
     }
   };
 
@@ -84,7 +81,7 @@ export default function EditProfile() {
         setAvatarUri(result.assets[0].uri);
       }
     } catch (error) {
-      showToast("Failed to load image", "error");
+      showToast("Không thể tải hình ảnh", "error");
     }
   };
 
@@ -99,38 +96,38 @@ export default function EditProfile() {
       style?: "default" | "cancel" | "destructive";
     }[] = [
       {
-        text: "Camera",
+        text: "Máy ảnh",
         onPress: pickImageFromCamera,
       },
       {
-        text: "Gallery",
+        text: "Thư viện",
         onPress: pickImageFromGallery,
       },
     ];
 
     if (avatarUri) {
       options.push({
-        text: "Remove Avatar",
+        text: "Xóa ảnh đại diện",
         onPress: removeAvatar,
         style: "destructive",
       });
     }
 
     options.push({
-      text: "Cancel",
+      text: "Hủy",
       style: "cancel",
     });
 
     Alert.alert(
-      "Select Avatar",
-      "Choose how you want to select your avatar",
+      "Chọn ảnh đại diện",
+      "Chọn cách bạn muốn chọn ảnh đại diện",
       options
     );
   };
 
   const handleSave = async () => {
     if (!fullname.trim()) {
-      showToast("Please enter your full name", "error");
+      showToast("Vui lòng nhập họ tên của bạn", "error");
       return;
     }
 
@@ -166,10 +163,10 @@ export default function EditProfile() {
       //   setUser(updatedUser);
       // }
 
-      showToast("Profile updated successfully!", "success");
+      showToast("Cập nhật hồ sơ thành công!", "success");
       router.back();
     } catch (error) {
-      showToast("Failed to update profile", "error");
+      showToast("Không thể cập nhật hồ sơ", "error");
     } finally {
       setLoading(false);
     }
@@ -197,7 +194,7 @@ export default function EditProfile() {
           />
         </TouchableOpacity>
         <Text className="text-xl w-full text-center font-[bold] text-foreground">
-          Edit Profile
+          Chỉnh sửa hồ sơ
         </Text>
       </View>
 
@@ -227,13 +224,13 @@ export default function EditProfile() {
           {/* Full Name */}
           <View className="flex gap-2">
             <Text className="text-sm font-[medium] text-foreground">
-              Full Name
+              Họ tên
             </Text>
             <View className="flex-row items-center flex">
               <TextInput
                 value={fullname}
                 onChangeText={setFullname}
-                placeholder="Enter your full name"
+                placeholder="Nhập họ tên của bạn"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 className={`w-full px-4 py-4 pl-12 bg-card-background border border-border rounded-xl text-foreground font-[medium] ${
                   isDark ? "text-white" : "text-gray-900"
@@ -259,7 +256,7 @@ export default function EditProfile() {
               <TextInput
                 value={user?.email || ""}
                 editable={false}
-                placeholder="Email address"
+                placeholder="Địa chỉ email"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 className={`w-full px-4 py-4 pl-12 bg-muted-background border border-border rounded-xl text-text-muted font-[medium]`}
               />
@@ -279,13 +276,13 @@ export default function EditProfile() {
           {/* Gender */}
           <View className="flex gap-2">
             <Text className="text-sm font-[medium] text-foreground">
-              Gender
+              Giới tính
             </Text>
             <View className="flex-row items-center flex opacity-60">
               <TextInput
                 value={user?.gender || ""}
                 editable={false}
-                placeholder="Gender"
+                placeholder="Giới tính"
                 placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
                 className={`w-full px-4 py-4 pl-12 bg-muted-background border border-border rounded-xl text-text-muted font-[medium]`}
               />
@@ -310,7 +307,7 @@ export default function EditProfile() {
           }`}
         >
           <Text className="text-foreground text-center text-lg font-[semibold]">
-            {loading ? "Saving..." : "Save"}
+            {loading ? "Đang lưu..." : "Lưu"}
           </Text>
         </TouchableOpacity>
       </ScrollView>

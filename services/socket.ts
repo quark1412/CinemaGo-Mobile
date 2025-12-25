@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 let socket: Socket | null = null;
 let socketPromise: Promise<Socket> | null = null;
 
-const SOCKET_URL = "http://192.168.1.9:8000";
+const SOCKET_URL = "http://192.168.1.6:8000";
 
 const createSocket = async (): Promise<Socket> => {
   const accessToken = await AsyncStorage.getItem("accessToken");
@@ -42,7 +42,7 @@ const createSocket = async (): Promise<Socket> => {
   });
 
   socket.on("connect_error", (error) => {
-    console.error("Socket connection error (mobile):", error);
+    console.log("Socket connection error (mobile):", error);
   });
 
   socket.on("reconnect", (attemptNumber) => {

@@ -377,7 +377,9 @@ export default function CheckoutScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={iconColor} />
         </TouchableOpacity>
-        <Text className={`text-lg font-semibold ${textColor}`}>Thanh toán</Text>
+        <Text className={`text-lg font-[semibold] ${textColor}`}>
+          Thanh toán
+        </Text>
         <View className="w-6" />
       </View>
 
@@ -390,7 +392,7 @@ export default function CheckoutScreen() {
         <View className={`mx-4 mt-4 mb-4 ${cardBg} rounded-xl p-4`}>
           <View className="flex-row">
             <View className="flex-1 mr-4">
-              <Text className={`${textColor} font-bold text-lg mb-2`}>
+              <Text className={`${textColor} font-[bold] text-lg mb-2`}>
                 {movie?.title}
               </Text>
               <Text className={`${textMuted} text-sm mb-1`}>
@@ -421,7 +423,7 @@ export default function CheckoutScreen() {
           <View className={`mt-4 pt-4 border-t ${borderColorLight}`}>
             <View className="flex-row justify-between mb-3">
               <Text className={`${textMuted} text-sm`}>Ghế đã chọn</Text>
-              <Text className={`${textColor} font-semibold`}>
+              <Text className={`${textColor} font-[semibold]`}>
                 {selectedSeats.join(", ")}
               </Text>
             </View>
@@ -447,7 +449,9 @@ export default function CheckoutScreen() {
                           {seat.type === "VIP" && " (VIP)"}
                           {isCouple && " (Đôi - 2 ghế)"}
                         </Text>
-                        <Text className={`${textColor} font-semibold text-sm`}>
+                        <Text
+                          className={`${textColor} font-[semibold] text-sm`}
+                        >
                           {new Intl.NumberFormat("vi-VN", {
                             style: "currency",
                             currency: "VND",
@@ -522,7 +526,7 @@ export default function CheckoutScreen() {
                   <Text className={`${textMuted} text-sm`}>
                     Tổng vé xem phim ({selectedSeats.length})
                   </Text>
-                  <Text className={`${textColor} font-semibold`}>
+                  <Text className={`${textColor} font-[semibold]`}>
                     {new Intl.NumberFormat("vi-VN", {
                       style: "currency",
                       currency: "VND",
@@ -535,7 +539,7 @@ export default function CheckoutScreen() {
             {/* Food/Drinks section */}
             {selectedFoodDrinks.length > 0 && foodDrinkQuantities && (
               <View className="mb-3 pt-2 border-t border-slate-600/30">
-                <Text className={`${textMuted} text-sm mb-2 font-semibold`}>
+                <Text className={`${textMuted} text-sm mb-2 font-[semibold]`}>
                   Bắp nước
                 </Text>
                 {selectedFoodDrinks.map((fd) => {
@@ -549,7 +553,7 @@ export default function CheckoutScreen() {
                         resizeMode="cover"
                       />
                       <View className="flex-1">
-                        <Text className={`${textColor} text-sm font-medium`}>
+                        <Text className={`${textColor} text-sm font-[medium]`}>
                           {fd.name}
                         </Text>
                         <Text className={`${textMuted} text-xs`}>
@@ -560,7 +564,7 @@ export default function CheckoutScreen() {
                           }).format(fd.price)}
                         </Text>
                       </View>
-                      <Text className={`${textColor} font-semibold`}>
+                      <Text className={`${textColor} font-[semibold]`}>
                         {new Intl.NumberFormat("vi-VN", {
                           style: "currency",
                           currency: "VND",
@@ -571,7 +575,7 @@ export default function CheckoutScreen() {
                 })}
                 <View className="flex-row justify-between mt-2 pt-2 border-t border-slate-600/30">
                   <Text className={`${textMuted} text-sm`}>Tổng bắp nước</Text>
-                  <Text className={`${textColor} font-semibold`}>
+                  <Text className={`${textColor} font-[semibold]`}>
                     {new Intl.NumberFormat("vi-VN", {
                       style: "currency",
                       currency: "VND",
@@ -584,10 +588,10 @@ export default function CheckoutScreen() {
             <View
               className={`flex-row justify-between mt-4 pt-4 border-t ${borderColorLight}`}
             >
-              <Text className={`${textColor} font-bold text-lg`}>
+              <Text className={`${textColor} font-[bold] text-lg`}>
                 Tổng cộng
               </Text>
-              <Text className={`${textColor} font-bold text-xl`}>
+              <Text className={`${textColor} font-[bold] text-xl`}>
                 {new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
@@ -599,7 +603,7 @@ export default function CheckoutScreen() {
 
         {/* Payment Method Selection */}
         <View className="mx-4 mb-4">
-          <Text className={`${textColor} font-bold text-lg mb-4`}>
+          <Text className={`${textColor} font-[bold] text-lg mb-4`}>
             Chọn phương thức thanh toán
           </Text>
 
@@ -621,7 +625,7 @@ export default function CheckoutScreen() {
                 <Ionicons name="cash-outline" size={20} color="#fff" />
               </View>
               <View>
-                <Text className={`${textColor} font-semibold`}>
+                <Text className={`${textColor} font-[semibold]`}>
                   Thanh toán tại quầy (COD)
                 </Text>
                 <Text className={`${textMuted} text-xs mt-1`}>
@@ -660,7 +664,7 @@ export default function CheckoutScreen() {
                 resizeMode="cover"
               />
               <View>
-                <Text className={`${textColor} font-semibold`}>Ví MoMo</Text>
+                <Text className={`${textColor} font-[semibold]`}>Ví MoMo</Text>
                 <Text className={`${textMuted} text-xs mt-1`}>
                   Thanh toán nhanh qua ứng dụng MoMo
                 </Text>
@@ -697,7 +701,7 @@ export default function CheckoutScreen() {
                 resizeMode="cover"
               />
               <View>
-                <Text className={`${textColor} font-semibold`}>ZaloPay</Text>
+                <Text className={`${textColor} font-[semibold]`}>ZaloPay</Text>
                 <Text className={`${textMuted} text-xs mt-1`}>
                   Thanh toán qua ví ZaloPay
                 </Text>
@@ -736,7 +740,7 @@ export default function CheckoutScreen() {
           {processing ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text className="text-white font-bold text-base">
+            <Text className="text-white font-[bold] text-base">
               Thanh Toán{" "}
               {new Intl.NumberFormat("vi-VN", {
                 style: "currency",

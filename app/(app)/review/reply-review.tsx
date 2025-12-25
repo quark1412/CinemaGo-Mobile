@@ -177,7 +177,7 @@ export default function ReplyReviewScreen() {
           if (!cancelled) setMovie(mv);
         }
       } catch (e) {
-        console.error("load reply-review error:", e);
+        console.log("load reply-review error:", e);
         if (!cancelled) setError("Không tải được bài đánh giá.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -205,7 +205,7 @@ export default function ReplyReviewScreen() {
       Keyboard.dismiss();
       showToast("Đăng reply thành công", "success");
     } catch (e) {
-      console.error("replyToReview error:", e);
+      console.log("replyToReview error:", e);
       showToast("Đăng reply thất bại", "error");
     } finally {
       setSending(false);

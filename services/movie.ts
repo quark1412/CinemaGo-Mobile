@@ -23,7 +23,7 @@ class MovieService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách phim.");
-      console.error("Get movies error:", e);
+      console.log("Get movies error:", e);
       throw new Error(msg);
     }
   }
@@ -37,7 +37,7 @@ class MovieService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách phim top rating.");
-      console.error("Get top rated movies error:", e);
+      console.log("Get top rated movies error:", e);
       throw new Error(msg);
     }
   }
@@ -51,7 +51,7 @@ class MovieService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy thông tin phim.");
-      console.error("Get movie detail error:", e);
+      console.log("Get movie detail error:", e);
       throw new Error(msg);
     }
   }
@@ -69,7 +69,7 @@ class MovieService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể tạo phim.");
-      console.error("Create movie error:", e);
+      console.log("Create movie error:", e);
       throw new Error(msg);
     }
   }
@@ -87,7 +87,7 @@ class MovieService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể cập nhật phim.");
-      console.error("Update movie error:", e);
+      console.log("Update movie error:", e);
       throw new Error(msg);
     }
   }
@@ -102,7 +102,7 @@ class MovieService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể cập nhật trạng thái phim.");
-      console.error("Update movie status error:", e);
+      console.log("Update movie status error:", e);
       throw new Error(msg);
     }
   }
@@ -114,7 +114,7 @@ class MovieService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể xóa (archive) phim.");
-      console.error("Archive movie error:", e);
+      console.log("Archive movie error:", e);
       throw new Error(msg);
     }
   }
@@ -126,7 +126,7 @@ class MovieService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể khôi phục phim.");
-      console.error("Restore movie error:", e);
+      console.log("Restore movie error:", e);
       throw new Error(msg);
     }
   }

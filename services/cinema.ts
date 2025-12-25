@@ -41,7 +41,7 @@ class CinemaService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy danh sách rạp chiếu.");
-      console.error("Get cinemas error:", e);
+      console.log("Get cinemas error:", e);
       throw new Error(msg);
     }
   }
@@ -54,7 +54,7 @@ class CinemaService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể lấy thông tin rạp chiếu.");
-      console.error("Get cinema detail error:", e);
+      console.log("Get cinema detail error:", e);
       throw new Error(msg);
     }
   }
@@ -68,7 +68,7 @@ class CinemaService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể tạo rạp chiếu.");
-      console.error("Create cinema error:", e);
+      console.log("Create cinema error:", e);
       throw new Error(msg);
     }
   }
@@ -85,7 +85,7 @@ class CinemaService {
       return data.data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể cập nhật rạp chiếu.");
-      console.error("Update cinema error:", e);
+      console.log("Update cinema error:", e);
       throw new Error(msg);
     }
   }
@@ -96,7 +96,7 @@ class CinemaService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể xóa (archive) rạp chiếu.");
-      console.error("Archive cinema error:", e);
+      console.log("Archive cinema error:", e);
       throw new Error(msg);
     }
   }
@@ -107,7 +107,7 @@ class CinemaService {
       return data;
     } catch (e: unknown) {
       const msg = getMsg(e, "Không thể khôi phục rạp chiếu.");
-      console.error("Restore cinema error:", e);
+      console.log("Restore cinema error:", e);
       throw new Error(msg);
     }
   }

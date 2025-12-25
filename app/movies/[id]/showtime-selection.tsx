@@ -194,7 +194,7 @@ export default function ShowtimeSelectionScreen() {
 
       showToast("Hết thời gian giữ ghế.", "error");
     } catch (error) {
-      console.error("Failed to release seats on timer expiration:", error);
+      console.log("Failed to release seats on timer expiration:", error);
     }
   }, [selectedShowtime, selectedSeats, showToast]);
 
@@ -334,7 +334,7 @@ export default function ShowtimeSelectionScreen() {
 
       setFoodDrinks(response.data);
     } catch (error: any) {
-      console.error("Failed to load food drinks:", error);
+      console.log("Failed to load food drinks:", error);
     } finally {
       setLoadingFoodDrinks(false);
     }
@@ -933,7 +933,6 @@ export default function ShowtimeSelectionScreen() {
 
   // Join/leave showtime room when selection changes
   useEffect(() => {
-    let isActive = true;
     const currentShowtimeId = selectedShowtime?.id || null;
 
     if (previousShowtimeIdRef.current === currentShowtimeId) {
@@ -942,7 +941,6 @@ export default function ShowtimeSelectionScreen() {
 
     (async () => {
       const socket = await getSocket();
-      if (!isActive) return;
 
       if (previousShowtimeIdRef.current) {
         socket.emit("leave-showtime", previousShowtimeIdRef.current);
@@ -959,10 +957,6 @@ export default function ShowtimeSelectionScreen() {
 
       previousShowtimeIdRef.current = currentShowtimeId;
     })();
-
-    return () => {
-      isActive = false;
-    };
   }, [selectedShowtime?.id]);
 
   // Listen for real-time seat updates from server (socket.io)
@@ -1031,10 +1025,7 @@ export default function ShowtimeSelectionScreen() {
           }
         }
       } catch (error) {
-        console.error(
-          "Failed to refresh seat data after socket update:",
-          error
-        );
+        console.log("Failed to refresh seat data after socket update:", error);
       }
     };
 
@@ -1100,50 +1091,6 @@ export default function ShowtimeSelectionScreen() {
     previousHeldSeatIdsRef.current = heldSeatIds;
   }, [selectedShowtime?.id, selectedSeats, heldSeatIds]);
 
-  // Cleanup on component unmount
-  const selectedShowtimeRef = useRef(selectedShowtime);
-  const selectedSeatsRef = useRef(selectedSeats);
-  const heldSeatIdsRef = useRef(heldSeatIds);
-
-  useEffect(() => {
-    selectedShowtimeRef.current = selectedShowtime;
-    selectedSeatsRef.current = selectedSeats;
-    heldSeatIdsRef.current = heldSeatIds;
-  });
-
-  useEffect(() => {
-    return () => {
-      const showtime = selectedShowtimeRef.current;
-      const seats = selectedSeatsRef.current;
-      const heldIds = heldSeatIdsRef.current;
-
-      if (!showtime || seats.length === 0) return;
-
-      // Release only seats that are actually held
-      const seatsToRelease = seats.filter(
-        (seat) => seat.id && heldIds.includes(seat.id)
-      );
-
-      if (seatsToRelease.length > 0) {
-        (async () => {
-          try {
-            await Promise.all(
-              seatsToRelease.map((seat) =>
-                bookingService
-                  .releaseSeat({
-                    showtimeId: showtime.id,
-                    seatId: seat.id as string,
-                  })
-                  .catch(() => {})
-              )
-            );
-          } catch {}
-        })();
-      }
-    };
-  }, []);
-
-  // Theme-aware colors
   const bgColor = isDark ? "bg-slate-950" : "bg-white";
   const cardBg = isDark ? "bg-slate-800" : "bg-slate-100";
   const cardBgSecondary = isDark ? "bg-slate-900" : "bg-slate-50";
@@ -1189,16 +1136,16 @@ export default function ShowtimeSelectionScreen() {
               <View
                 className={`${cardBgSecondary} rounded-lg px-2 py-1 items-center`}
               >
-                <Text className={`${textColor} text-lg font-bold`}>
+                <Text className={`${textColor} text-lg font-[bold]`}>
                   {timeDisplay.minutes}
                 </Text>
                 <Text className={`${textMuted} text-[10px]`}>Phút</Text>
               </View>
-              <Text className={`${textColor} text-lg font-bold`}>:</Text>
+              <Text className={`${textColor} text-lg font-[bold]`}>:</Text>
               <View
                 className={`${cardBgSecondary} rounded-lg px-2 py-1 items-center`}
               >
-                <Text className={`${textColor} text-lg font-bold`}>
+                <Text className={`${textColor} text-lg font-[bold]`}>
                   {timeDisplay.seconds}
                 </Text>
                 <Text className={`${textMuted} text-[10px]`}>Giây</Text>
@@ -1215,7 +1162,7 @@ export default function ShowtimeSelectionScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={iconColor} />
         </TouchableOpacity>
-        <Text className={`text-lg font-semibold ${textColor}`}>Chọn vé</Text>
+        <Text className={`text-lg font-[semibold] ${textColor}`}>Chọn vé</Text>
         <View className="w-6" />
       </View>
 
@@ -1226,7 +1173,7 @@ export default function ShowtimeSelectionScreen() {
       >
         {/* Date Selection Section */}
         <View className={`py-5 border-b ${borderColor}`}>
-          <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+          <Text className={`text-lg font-[semibold] ${textColor} px-4 mb-4`}>
             Chọn Suất Chiếu
           </Text>
           <ScrollView
@@ -1247,14 +1194,14 @@ export default function ShowtimeSelectionScreen() {
                 <Text
                   className={`text-center ${
                     selectedDate?.fullDate === date.fullDate
-                      ? "text-red-600 font-bold"
+                      ? "text-red-600 font-[bold]"
                       : textMuted
                   }`}
                 >
                   {date.dayOfWeek}
                 </Text>
                 <Text
-                  className={`text-center text-lg font-bold ${
+                  className={`text-center text-lg font-[bold] ${
                     selectedDate?.fullDate === date.fullDate
                       ? "text-red-600"
                       : textColor
@@ -1270,7 +1217,7 @@ export default function ShowtimeSelectionScreen() {
         {/* Showtime Selection */}
         {selectedDate && (
           <View className={`py-5 border-b ${borderColor}`}>
-            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+            <Text className={`text-lg font-[semibold] ${textColor} px-4 mb-4`}>
               Chọn Giờ Chiếu
             </Text>
             {filteredShowtimes.length === 0 ? (
@@ -1302,7 +1249,7 @@ export default function ShowtimeSelectionScreen() {
                       disabled={isPastShowtime}
                     >
                       <Text
-                        className={`text-center font-bold ${
+                        className={`text-center font-[bold] ${
                           isSelected ? "text-red-600" : textColor
                         }`}
                       >
@@ -1320,7 +1267,7 @@ export default function ShowtimeSelectionScreen() {
                         {showtime.language} • {showtime.format}
                       </Text>
                       <Text
-                        className={`text-center text-xs mt-1 font-semibold ${
+                        className={`text-center text-xs mt-1 font-[semibold] ${
                           isSelected ? "text-red-600" : textColor
                         }`}
                       >
@@ -1340,7 +1287,7 @@ export default function ShowtimeSelectionScreen() {
         {/* Seat Selection */}
         {selectedShowtime && (
           <View className={`py-5 border-b ${borderColor}`}>
-            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+            <Text className={`text-lg font-[semibold] ${textColor} px-4 mb-4`}>
               Chọn Ghế {room?.name && `- ${room.name}`}
             </Text>
             {loadingSeatMap ? (
@@ -1379,7 +1326,7 @@ export default function ShowtimeSelectionScreen() {
                       isDark ? "bg-slate-800" : "bg-slate-800"
                     }`}
                   >
-                    <Text className="text-white text-sm font-semibold">
+                    <Text className="text-white text-sm font-[semibold]">
                       MÀN HÌNH
                     </Text>
                   </View>
@@ -1406,7 +1353,7 @@ export default function ShowtimeSelectionScreen() {
                             {/* Row label (left) */}
                             <View className="w-8 h-12 items-center justify-center mr-2">
                               <Text
-                                className={`${textMuted} text-sm font-bold`}
+                                className={`${textMuted} text-sm font-[bold]`}
                               >
                                 {rowLetter}
                               </Text>
@@ -1457,7 +1404,7 @@ export default function ShowtimeSelectionScreen() {
                                           color={iconColor}
                                         />
                                         <Text
-                                          className={`text-[10px] font-bold mt-0.5`}
+                                          className={`text-[10px] font-[bold] mt-0.5`}
                                           style={{ color: textColor }}
                                         >
                                           {seat.seatNumber}
@@ -1520,7 +1467,7 @@ export default function ShowtimeSelectionScreen() {
                                         )}
                                         {seat.seatNumber && (
                                           <Text
-                                            className={`text-[10px] font-bold leading-none mt-0.5`}
+                                            className={`text-[10px] font-[bold] leading-none mt-0.5`}
                                             style={{ color: textColor }}
                                           >
                                             {seat.seatNumber}
@@ -1536,7 +1483,7 @@ export default function ShowtimeSelectionScreen() {
                             {/* Row label (right) */}
                             <View className="w-8 h-12 items-center justify-center ml-2">
                               <Text
-                                className={`${textMuted} text-sm font-bold`}
+                                className={`${textMuted} text-sm font-[bold]`}
                               >
                                 {rowLetter}
                               </Text>
@@ -1553,7 +1500,9 @@ export default function ShowtimeSelectionScreen() {
                             key={index}
                             className="w-12 h-6 items-center justify-center"
                           >
-                            <Text className={`${textMuted} text-xs font-bold`}>
+                            <Text
+                              className={`${textMuted} text-xs font-[bold]`}
+                            >
                               {index + 1}
                             </Text>
                           </View>
@@ -1575,7 +1524,7 @@ export default function ShowtimeSelectionScreen() {
         {/* Food/Drinks Selection */}
         {selectedShowtime && foodDrinks.length > 0 && (
           <View className={`py-5 border-b ${borderColor}`}>
-            <Text className={`text-lg font-semibold ${textColor} px-4 mb-4`}>
+            <Text className={`text-lg font-[semibold] ${textColor} px-4 mb-4`}>
               Đồ Ăn & Nước Uống
             </Text>
             <ScrollView
@@ -1600,7 +1549,7 @@ export default function ShowtimeSelectionScreen() {
                         />
                       )}
                       <Text
-                        className={`${textColor} font-semibold text-sm mb-1`}
+                        className={`${textColor} font-[semibold] text-sm mb-1`}
                         numberOfLines={2}
                       >
                         {foodDrink.name}
@@ -1632,7 +1581,7 @@ export default function ShowtimeSelectionScreen() {
                           color={quantity > 0 ? "#fff" : iconColor}
                         />
                       </TouchableOpacity>
-                      <Text className={`${textColor} font-bold mx-2`}>
+                      <Text className={`${textColor} font-[bold] mx-2`}>
                         {quantity}
                       </Text>
                       <TouchableOpacity
@@ -1654,7 +1603,7 @@ export default function ShowtimeSelectionScreen() {
         {/* Summary */}
         {(selectedSeats.length > 0 || selectedFoodDrinks.length > 0) && (
           <View className={`mx-4 mt-4 mb-4 ${cardBg} rounded-xl p-4`}>
-            <Text className={`${textColor} font-bold text-lg mb-3`}>
+            <Text className={`${textColor} font-[bold] text-lg mb-3`}>
               Tóm Tắt
             </Text>
             {selectedSeats.length > 0 && (
@@ -1662,7 +1611,7 @@ export default function ShowtimeSelectionScreen() {
                 <Text className={`${textMuted} text-sm mb-2`}>
                   Ghế đã chọn:
                 </Text>
-                <Text className={`${textColor} font-semibold`}>
+                <Text className={`${textColor} font-[semibold]`}>
                   {selectedSeats.map((s) => s.seatNumber).join(", ")}
                 </Text>
               </View>
@@ -1678,8 +1627,8 @@ export default function ShowtimeSelectionScreen() {
               </View>
             )}
             <View className="flex-row justify-between mt-3 pt-3 border-t border-slate-600/30">
-              <Text className={`${textColor} font-bold text-lg`}>Tổng:</Text>
-              <Text className={`${textColor} font-bold text-lg`}>
+              <Text className={`${textColor} font-[bold] text-lg`}>Tổng:</Text>
+              <Text className={`${textColor} font-[bold] text-lg`}>
                 {new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
@@ -1699,7 +1648,7 @@ export default function ShowtimeSelectionScreen() {
             className="bg-red-600 py-4 rounded-xl items-center"
             onPress={handleProceedToCheckout}
           >
-            <Text className="text-white font-bold text-base">
+            <Text className="text-white font-[bold] text-base">
               Tiếp Tục -{" "}
               {new Intl.NumberFormat("vi-VN", {
                 style: "currency",
