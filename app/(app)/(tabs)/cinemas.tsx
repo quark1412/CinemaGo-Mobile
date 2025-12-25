@@ -171,9 +171,12 @@ export default function Cinemas() {
           return { ...c, distance };
         });
 
-        withDistance.sort((a, b) => a.distance - b.distance);
+        // Filter for cinemas within 20km
+        const nearby = withDistance.filter(c => c.distance <= 20);
 
-        return withDistance.slice(0, 2);
+        nearby.sort((a, b) => a.distance - b.distance);
+
+        return nearby.slice(0, 5);
       } else {
         return filtered;
       }

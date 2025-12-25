@@ -31,21 +31,26 @@ export default function Account() {
 
   useEffect(() => {
     (async () => {
+      if (!user?.id) return;
       try {
         setCheckingBio(true);
         const supported = await canUseBiometric();
         setBioSupported(supported);
-        setBioEnabled(await isBiometricEnabled());
+        setBioEnabled(await isBiometricEnabled(user.id));
       } finally {
         setCheckingBio(false);
       }
     })();
-  }, []);
+  }, [user?.id]);
 
   const onToggleBiometric = async () => {
+    if (!user?.id) {
+      showToast("Vui lòng đăng nhập lại để thực hiện.");
+      return;
+    }
     try {
       if (bioEnabled) {
-        await disableBiometricLogin();
+        await disableBiometricLogin(user.id);
         setBioEnabled(false);
         showToast("Đã tắt đăng nhập sinh trắc học");
         return;
@@ -62,7 +67,7 @@ export default function Account() {
         return;
       }
 
-      const ok = await enableBiometricLogin(currentRefreshToken);
+      const ok = await enableBiometricLogin(user.id, currentRefreshToken);
       setBioEnabled(!!ok);
       showToast(ok ? "Đã bật đăng nhập sinh trắc học" : "Không thể bật");
     } catch {
@@ -152,27 +157,25 @@ export default function Account() {
             </Text>
           </TouchableOpacity>
 
-          {bioSupported && (
-            <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="finger-print-outline"
-                  size={24}
-                  color={isDark ? "#fff" : "#1f2937"}
-                />
-                <View className="ml-3">
-                  <Text className="font-[semibold] text-foreground">
-                    Đăng nhập sinh trắc học
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={bioEnabled}
-                onValueChange={onToggleBiometric}
-                disabled={!bioSupported || checkingBio}
+          <View className="flex-row items-center justify-between p-4 bg-card-background rounded-xl border border-border">
+            <View className="flex-row items-center">
+              <Ionicons
+                name="finger-print-outline"
+                size={24}
+                color={isDark ? "#fff" : "#1f2937"}
               />
+              <View className="ml-3">
+                <Text className="font-[semibold] text-foreground">
+                  Đăng nhập sinh trắc học
+                </Text>
+              </View>
             </View>
-          )}
+            <Switch
+              value={bioEnabled}
+              onValueChange={onToggleBiometric}
+              disabled={checkingBio}
+            />
+          </View>
         </View>
 
         <TouchableOpacity

@@ -87,7 +87,6 @@ instance.interceptors.request.use(
   }
 );
 
-// Add response interceptor for better error handling
 instance.interceptors.response.use(
   (response) => response,
   (error) => {

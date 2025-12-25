@@ -1,4 +1,10 @@
 import { authService } from "@/services/users/auth";
+import {
+  clearBiometricDataForUser,
+  getBiometricUserId,
+  isBiometricEnabled,
+  updateBiometricToken,
+} from "@/services/users/biometric";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import {
@@ -40,19 +46,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const refreshToken = await AsyncStorage.getItem("refreshToken");
+      console.log("Checking session, refreshToken exists:", !!refreshToken);
 
       if (refreshToken) {
-        console.log("Phát hiện Refresh Token, đang khôi phục phiên...");
-        await authService.loginWithRefreshToken(refreshToken);
+        console.log("Found Refresh Token, attempting refresh...");
+        const { refreshToken: newRefreshToken, accessToken } =
+          await authService.loginWithRefreshToken(refreshToken);
+        console.log("Token refreshed success. AccessToken:", !!accessToken);
 
-        const userData = await authService.getProfile();
+        const userData = await authService.getProfile(accessToken);
+        console.log("Profile fetched:", userData?.id);
+
         setUser(userData);
         setIsAuthenticated(true);
+
+        // Update biometric token if this user is enabled
+        if (userData?.id) {
+          console.log("Updating bio token for user:", userData.id);
+          await updateBiometricToken(userData.id, newRefreshToken);
+        }
       } else {
+        console.log("No token found, handling logout state.");
         handleLogoutState();
       }
-    } catch (error) {
-      console.log("Phiên đăng nhập hết hạn hoặc lỗi:", error);
+    } catch (error: any) {
+      console.log("Detailed Session Check Error:", error);
+      console.log("Error Message:", error?.message);
+      if (error?.response) {
+        console.log("API Log:", error.response.status, error.response.data);
+      }
       await handleLogoutState();
     } finally {
       setIsLoading(false);
@@ -88,13 +110,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      await authService.login(email, password);
-      const userData = await authService.getProfile();
+      const response = await authService.login(email, password);
+
+      const { accessToken } = response;
+      const userData = await authService.getProfile(accessToken);
+
+      setUser(userData);
+      setIsAuthenticated(true);
 
       if (userData.role === "ADMIN") {
         await authService.logout();
 
         throw new Error("Tài khoản quản lý không được truy cập.");
+      }
+
+      const currentBioUser = await getBiometricUserId();
+      if (currentBioUser && currentBioUser !== userData.id) {
+        await clearBiometricDataForUser(currentBioUser);
+      }
+
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+      if (refreshToken) {
+        await updateBiometricToken(userData.id, refreshToken);
       }
     } catch (error) {
       setUser(null);
@@ -105,7 +142,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await authService.logout();
+      if (user?.id && (await isBiometricEnabled(user.id))) {
+        console.log("Biometric enabled, performing local logout only.");
+      } else {
+        await authService.logout();
+      }
     } catch (error) {
       console.log("Logout error:", error);
     } finally {
@@ -120,10 +161,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkSession();
-  }, []);
-
-  useEffect(() => {
-    fetchUserProfile();
   }, []);
 
   const value: UserContextType = {
