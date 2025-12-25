@@ -1,50 +1,51 @@
-# Welcome to your Expo app 👋
+# 🎬 CinemaGo Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> Ứng dụng đặt vé xem phim trên Mobile (React Native - Expo).
 
-## Get started
+---
 
-1. Install dependencies
+## 🚀 Hướng dẫn Cài đặt & Chạy dự án (Quick Start)
 
-   ```bash
-   npm install
-   ```
+Để chạy dự án này, máy tính cần có sẵn **Node.js** (v20+) và **Git**.
 
-2. Start the app
+### 1. Cài đặt môi trường (Setup)
 
-   ```bash
-   npx expo start
-   ```
+Mở Terminal (hoặc CMD) tại thư mục muốn lưu dự án và chạy lần lượt các bước sau:
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+**Bước A: Tải code & Cài thư viện**
 
 ```bash
-npm run reset-project
+# 1. Clone dự án về máy
+git clone <LINK_GIT_REPO_CUA_BAN>
+
+# 2. Di chuyển vào thư mục dự án
+cd cinemago-mobile
+
+# 3. Cài đặt toàn bộ thư viện (Node modules)
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+**Bước B: Cấu hình IP & Biến môi trường (.env)**
 
-## Learn more
+Vì ứng dụng chạy trên điện thoại, bạn cần cung cấp **địa chỉ IP mạng LAN** của máy tính để điện thoại có thể kết nối được (không dùng `localhost`).
 
-To learn more about developing your project with Expo, look at the following resources:
+1. **Lấy địa chỉ IP:**
+   - **Windows:** Mở CMD gõ lệnh `ipconfig`. Tìm dòng **IPv4 Address** (Ví dụ: `192.168.1.10`).
+   - **Mac/Linux:** Mở Terminal gõ lệnh `ifconfig` (hoặc `ipconfig getifaddr en0`).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+2. **Tạo file cấu hình:**
+   - Tại thư mục gốc dự án, tạo một file mới tên là `.env`.
+   - Copy nội dung dưới đây dán vào file `.env` và **thay số IP** bạn vừa tìm được:
 
-## Join the community
+```env
+# Thay 192.168.1.X bằng IP máy tính của bạn
+EXPO_PUBLIC_API_URL=(http://192.168.1):8000
+```
 
-Join our community of developers creating universal apps.
+**Bước C: Chạy dự án**
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+npx expo start
+
+1. **Màn hình sẽ hiện ra QR code**
+   - **Android**: Mở app Expo Go, chọn "Scan QR Code" và quét mã.
+   - **iOS**: Mở Camera, quét mã và chọn mở bằng Expo Go.
